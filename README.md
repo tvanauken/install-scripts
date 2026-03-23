@@ -8,7 +8,7 @@ A collection of Proxmox VE helper/installer scripts styled after the [Proxmox VE
 
 | Script | Description |
 |--------|-------------|
-| [cli-tools/cli-tools-install.sh](cli-tools/cli-tools-install.sh) | Installs 44 CLI tools + X11 dependencies on a Proxmox VE host |
+| [cli-tools/cli-tools-install.sh](cli-tools/cli-tools-install.sh) | Installs 46 CLI tools + X11 dependencies on a Proxmox VE host |
 
 ## Usage
 

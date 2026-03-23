@@ -6,7 +6,7 @@
 
 ## Overview
 
-Installs and verifies **44 CLI tools** on a Proxmox VE host, grouped into logical categories. Features a Proxmox-community-script-style colourised terminal UI with per-package progress, post-install configuration, and a final verification + summary.
+Installs and verifies **46 CLI tools** on a Proxmox VE host, grouped into logical categories. Features a Proxmox-community-script-style colourised terminal UI with per-package progress, post-install configuration, and a final verification + summary.
 
 ## Run
 
@@ -52,6 +52,8 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 | nfs-common | NFS client |
 | nfs-kernel-server | NFS server |
 | qemu-guest-agent | QEMU/KVM guest agent |
+| iperf3 | Network bandwidth testing tool (current) |
+| iperf | Network bandwidth testing tool (legacy v2) |
 
 ### Shell, Dev & Terminal Tools
 | Package | Description |

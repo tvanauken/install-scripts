@@ -152,6 +152,8 @@ install_all() {
   install_pkg "nfs-common"
   install_pkg "nfs-kernel-server"
   install_pkg "qemu-guest-agent"
+  install_pkg "iperf3"
+  install_pkg "iperf"
 
   section "Shell, Dev & Terminal Tools"
   install_pkg "tmux"
@@ -241,6 +243,8 @@ verify() {
     "dialog:dialog"
     "dos2unix:dos2unix"
     "qemu-guest-agent:qemu-ga"
+    "iperf3:iperf3"
+    "iperf:iperf"
     "libguestfs-tools:virt-filesystems"
     "xauth:xauth"
     "xterm:xterm"
