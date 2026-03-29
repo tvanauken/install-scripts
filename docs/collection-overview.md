@@ -1,31 +1,33 @@
 # Van Auken Tech — Install Scripts Collection
 ### Thomas Van Auken — Van Auken Tech
 **Repository:** https://github.com/tvanauken/install-scripts
-**Host:** atlas.mgmt.home.vanauken.tech · Proxmox VE 9.1.6 · Debian Trixie
 
 ---
 
 ## What This Repository Is
 
-A collection of custom scripts for Proxmox VE system builds, all adhering to the **Van Auken Tech standard** for script design and visual presentation. Every script in this collection shares a unified look, feel, and behaviour so that any operator familiar with one script is immediately comfortable running any other.
+A collection of custom scripts for Van Auken Tech infrastructure, all adhering to the **Van Auken Tech standard** for script design and visual presentation. Every script in this collection shares a unified look, feel, and behaviour so that any operator familiar with one script is immediately comfortable running any other.
 
-Scripts are modelled after the [Proxmox VE Community Scripts](https://community-scripts.org/scripts) and are designed to be run directly on Proxmox VE hosts as root.
+Scripts 1–3 are modelled after the [Proxmox VE Community Scripts](https://community-scripts.org/scripts) and are designed for Proxmox VE hosts. Script 4 targets Raspberry Pi specifically.
 
 ---
 
 ## Scripts in This Collection
 
-| Script | Directory | Purpose |
-|--------|-----------|--------|
-| CLI Tools Installer | [`cli-tools/`](../cli-tools/) | Installs 46 CLI tools + X11 deps on a PVE host |
-| PVE Drive Cleanup & Init | [`pve-drive-init/`](../pve-drive-init/) | Wipes drives with remnant data for fresh deployment |
-| Drive Inventory Generator | [`drive-inventory/`](../drive-inventory/) | Scans all drives and generates a markdown inventory report |
+| # | Script | Directory | Target | Purpose |
+|---|--------|-----------|--------|---------|
+| 1 | CLI Tools Installer | [`cli-tools/`](../cli-tools/) | Proxmox VE | Installs 46 CLI tools + X11 deps |
+| 2 | PVE Drive Cleanup & Init | [`pve-drive-init/`](../pve-drive-init/) | Proxmox VE | Wipes drives with remnant data for fresh deployment |
+| 3 | Drive Inventory Generator | [`drive-inventory/`](../drive-inventory/) | Proxmox VE | Scans all drives, generates markdown inventory report |
+| 4 | **Raspberry Pi Setup** | [`pi-setup/`](../pi-setup/) | **Raspberry Pi** | Kali tools + XFCE desktop + performance tuning |
+
+> ⚠ Script 4 is **RASPBERRY PI ONLY** — armhf/arm64 Raspbian. Not compatible with Proxmox VE or x86 systems.
 
 ---
 
 ## The Van Auken Tech Standard
 
-Every script in this collection must conform to the following standard. This ensures consistency, readability, and professionalism across all tools.
+Every script in this collection must conform to the following standard.
 
 ### Visual Identity
 
@@ -33,14 +35,14 @@ Every script in this collection must conform to the following standard. This ens
 |---------|---------------|
 | Header | figlet "small" font — `VANAUKEN TECH` in cyan/bold |
 | Subtitle | Script-specific title line below header |
-| Host / Date / PVE / Log | Printed below header on every run |
+| Host / Date / Log | Printed below header on every run |
 | Colour palette | `RD` `YW` `GN` `DGN` `BL` `CL` `BLD` (no hardcoded ANSI strings) |
 | Section dividers | `── Section Name ──────────────────────────...` (cyan/bold) |
 | Progress: in-progress | `◆  message...` (cyan) |
 | Progress: success | `✔  message` (green) |
 | Progress: warning | `⚠  message` (yellow) |
 | Progress: error | `✘  message` (red) |
-| Progress: item/drive | `[▸] item...` (cyan) |
+| Progress: item | `[▸] item...` (cyan) |
 | Completion block | `════════════...` style (cyan/bold) |
 | Footer | `────────────...` with host + timestamp (dark green) |
 | Attribution | `Created by: Thomas Van Auken — Van Auken Tech` in every footer |
@@ -50,15 +52,14 @@ Every script in this collection must conform to the following standard. This ens
 | Requirement | Specification |
 |-------------|---------------|
 | Shebang | `#!/usr/bin/env bash` |
-| Shell | bash only (not sh or zsh) |
-| Error handling | `set -o pipefail` minimum; add `set -e` only where appropriate |
-| Cleanup trap | `trap cleanup EXIT` — resets terminal cursor on exit/interrupt |
-| Root check | Every script checks `$EUID -ne 0` and exits with a clear error |
-| Dependency install | Missing tools auto-installed via `apt-get` with a hard-verify pass after |
-| Log file | Every script writes a timestamped log to `/var/log/` |
-| Non-interactive apt | Always use `DEBIAN_FRONTEND=noninteractive apt-get install -y` |
-| No `--no-install-recommends` | Full installs — do not strip recommended packages |
-| Attribution | Script header comment must include author, version, date, repo URL |
+| Shell | bash only |
+| Error handling | `set -o pipefail` minimum; graceful per-step failures |
+| Cleanup trap | `trap cleanup EXIT` — resets terminal cursor |
+| Root check | Every script checks `$EUID -ne 0` |
+| Dependency install | Missing tools auto-installed via `apt-get` |
+| Log file | Every script writes a timestamped log |
+| Non-interactive apt | Always `DEBIAN_FRONTEND=noninteractive apt-get install -y` |
+| Attribution | Script header comment includes author, version, date, repo URL |
 
 ### Documentation Standard
 
@@ -79,46 +80,49 @@ Every script directory must contain:
 
 ```
 install-scripts/
-├── README.md                              Collection index
+├── README.md
 ├── docs/
-│   └── collection-overview.md             This document
+│   └── collection-overview.md
 ├── cli-tools/
 │   ├── cli-tools-install.sh
 │   ├── README.md
 │   └── docs/
-│       ├── user-manual.md
-│       └── build-log.md
 ├── pve-drive-init/
 │   ├── drive_init.sh
 │   ├── README.md
 │   └── docs/
-│       ├── user-manual.md
-│       └── build-log.md
-└── drive-inventory/
-    ├── generate_drive_inventory.sh
+├── drive-inventory/
+│   ├── generate_drive_inventory.sh
+│   ├── README.md
+│   └── docs/
+└── pi-setup/              ⚠ RASPBERRY PI ONLY
+    ├── pi-setup.sh
     ├── README.md
     └── docs/
-        ├── user-manual.md
-        └── build-log.md
 ```
 
 ---
 
 ## Quick Reference — One-Liners
 
-### Install CLI Tools
+### Install CLI Tools (Proxmox VE)
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/cli-tools/cli-tools-install.sh)
 ```
 
-### Wipe Drives for Redeployment
+### Wipe Drives for Redeployment (Proxmox VE)
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pve-drive-init/drive_init.sh)
 ```
 
-### Generate Drive Inventory Report
+### Generate Drive Inventory Report (Proxmox VE)
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/drive-inventory/generate_drive_inventory.sh)
+```
+
+### Raspberry Pi Setup — Kali Tools + XFCE + Performance
+```bash
+sudo bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pi-setup/pi-setup.sh)
 ```
 
 > **Note:** These one-liners require the repository to be set to **Public** in GitHub settings.
@@ -126,4 +130,3 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 ---
 
 *Created by: Thomas Van Auken — Van Auken Tech*
-*atlas.mgmt.home.vanauken.tech*
