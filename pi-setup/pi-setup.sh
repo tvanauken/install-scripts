@@ -3,7 +3,7 @@
 # Van Auken Tech — Raspberry Pi Setup
 # Kali Linux Security Tools · XFCE Remote Desktop · Performance Tuning
 # Created by: Thomas Van Auken — Van Auken Tech
-# Version: 1.1.2
+# Version: 1.1.3
 # Date: 2026-03-29
 # Repo: https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -38,7 +38,7 @@
 #   10 · Go tools             (pre-built ARM binaries — no compilation)
 #   11 · Kali repository + Metasploit
 #   12 · Wordlists            (rockyou.txt)
-#   13 · XFCE4 + TigerVNC    (headless, port 5901, auto-start)
+#   13 · XFCE4 + TigerVNC    (headless, root session, port 5901, auto-start)
 #   14 · Performance tuning   (CPU, sysctl, services, boot config)
 #   15 · ZSH shell environment
 #   16 · Verification & summary
@@ -149,12 +149,12 @@ header_info() {
    \_/_/ \_\_|\_/_/ \_\___/|_|\_\___||_|\_| |_| |___\___|_||_|
 BANNER
   echo -e "${CL}"
-  echo -e "${DGN} ── Raspberry Pi Setup v1.1.2 — Kali Tools · XFCE Desktop · Performance ──${CL}"
+  echo -e "${DGN} ── Raspberry Pi Setup v1.1.3 — Kali Tools · XFCE Desktop · Performance ──${CL}"
   printf " ${DGN}Host  :${CL} ${BL}%s${CL}\n" "$(hostname -f 2>/dev/null || hostname)"
   printf " ${DGN}Date  :${CL} ${BL}%s${CL}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
   printf " ${DGN}Log   :${CL} ${BL}%s${CL}\n" "$LOGFILE"
   echo ""
-  echo "Van Auken Tech Pi Setup v1.1.2 Log - $(date)" > "$LOGFILE"
+  echo "Van Auken Tech Pi Setup v1.1.3 Log - $(date)" > "$LOGFILE"
 }
 
 # ── Section 1 — Hardware Detection ───────────────────────────────────────────
@@ -401,7 +401,6 @@ setup_kali_repo() {
 
   if $OS_IS_KALI; then
     msg_ok "Running on Kali Linux — kali-rolling pre-configured"
-    echo -e "${TAB}${YW}⚠  Skipping GPG key + repo addition (already Kali)${CL}\n"
     DEBIAN_FRONTEND=noninteractive apt-get update -qq >> "$LOGFILE" 2>&1
     printf "${TAB}${BL}[▸]${CL} Installing %-42s" "metasploit-framework..."
     if command -v msfconsole >/dev/null 2>&1; then
@@ -453,21 +452,11 @@ EOF
     && { printf "${GN}✔ OK${CL}\n"; INSTALLED+=("kali-linux-core"); } \
     || { printf "${YW}⚠ Partial${CL}\n"; SKIPPED+=("kali-linux-core (kali-defaults conflict expected)"); }
 
-  # ── Fully repair dpkg state after kali-linux-core attempt ──────────────────
-  # The `wordlists` package (depends on kali-defaults which is held) gets stuck
-  # in an unpacked-but-not-configured state. This BLOCKS all subsequent apt
-  # operations on the system, including XFCE4 and TigerVNC installation.
-  #
-  # Fix:
-  #   1. Remove cached kali-defaults deb to prevent re-unpack
-  #   2. Force-remove wordlists from dpkg state (rockyou.txt file stays on disk)
-  #   3. Configure any remaining unconfigured packages
-  #   4. Run fix-broken to resolve any remaining dependency issues
   rm -f /var/cache/apt/archives/kali-defaults*.deb 2>/dev/null || true
   dpkg --remove --force-remove-reinstreq wordlists 2>/dev/null || true
   dpkg --configure -a 2>/dev/null || true
   DEBIAN_FRONTEND=noninteractive apt-get --fix-broken install -y >> "$LOGFILE" 2>&1 || true
-  msg_ok "Package state fully repaired (wordlists dpkg entry removed, rockyou.txt preserved on disk)"
+  msg_ok "Package state fully repaired"
 }
 
 # ── Section 12 — Wordlists ────────────────────────────────────────────────────
@@ -497,7 +486,8 @@ setup_wordlists() {
 # ── Section 13 — XFCE4 Desktop + TigerVNC ────────────────────────────────────
 setup_desktop_and_vnc() {
   section "XFCE4 Desktop + TigerVNC Remote Desktop"
-  echo -e "${TAB}${YW}⚠  Headless VNC-only — no display manager installed${CL}"
+  echo -e "${TAB}${YW}⚠  Headless VNC-only — root session — no display manager installed${CL}"
+  echo -e "${TAB}${YW}   VNC runs as root: all security tools work without sudo in the desktop${CL}"
   echo -e "${TAB}${YW}   Default VNC password: VanAwsome1 — change with: vncpasswd${CL}\n"
 
   for pkg in xfce4 xfce4-terminal xfce4-goodies; do install_pkg "$pkg"; done
@@ -508,28 +498,32 @@ setup_desktop_and_vnc() {
   $LOW_RESOURCE && VNC_GEOM="1280x720"
   msg_ok "VNC geometry: ${VNC_GEOM}"
 
-  mkdir -p "${ACTUAL_HOME}/.vnc"
-  printf 'VanAwsome1\nVanAwsome1\n\n' | vncpasswd "${ACTUAL_HOME}/.vnc/passwd" >> "$LOGFILE" 2>&1 || \
-    printf '%s\n' 'VanAwsome1' | vncpasswd -f > "${ACTUAL_HOME}/.vnc/passwd"
-  chmod 600 "${ACTUAL_HOME}/.vnc/passwd"
-  msg_ok "VNC password set (change with: vncpasswd)"
+  # VNC runs as root — configure in /root/.vnc
+  # This eliminates all file permission issues with log files and system tools
+  mkdir -p /root/.vnc
 
-  cat > "${ACTUAL_HOME}/.vnc/xstartup" << 'XSTART'
+  printf 'VanAwsome1\nVanAwsome1\n\n' | vncpasswd /root/.vnc/passwd >> "$LOGFILE" 2>&1 || \
+    printf '%s\n' 'VanAwsome1' | vncpasswd -f > /root/.vnc/passwd
+  chmod 600 /root/.vnc/passwd
+  msg_ok "VNC password set in /root/.vnc/passwd (change with: vncpasswd)"
+
+  cat > /root/.vnc/xstartup << 'XSTART'
 #!/bin/bash
 unset SESSION_MANAGER
 unset DBUS_SESSION_BUS_ADDRESS
 [ -r /etc/X11/Xresources ]  && xrdb /etc/X11/Xresources
-[ -r "$HOME/.Xresources" ]  && xrdb -merge "$HOME/.Xresources" 2>/dev/null || true
+[ -r /root/.Xresources ]    && xrdb -merge /root/.Xresources 2>/dev/null || true
+# Disable XFCE compositor — single biggest VNC responsiveness improvement
 if command -v xfconf-query >/dev/null 2>&1; then
   xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
 fi
 exec startxfce4 --replace
 XSTART
-  chmod +x "${ACTUAL_HOME}/.vnc/xstartup"
-  chown -R "${ACTUAL_USER}:${ACTUAL_USER}" "${ACTUAL_HOME}/.vnc"
-  msg_ok "VNC xstartup: XFCE4 (compositor disabled)"
+  chmod +x /root/.vnc/xstartup
+  msg_ok "VNC xstartup configured: /root/.vnc/xstartup"
 
-  cat > /etc/systemd/system/vncserver@.service << SVCEOF
+  # Systemd service runs as root — no permission issues ever
+  cat > /etc/systemd/system/vncserver@.service << 'SVCEOF'
 [Unit]
 Description=TigerVNC Server on display :%i — Van Auken Tech
 After=syslog.target network.target
@@ -537,12 +531,15 @@ Wants=network.target
 
 [Service]
 Type=forking
-User=${ACTUAL_USER}
-Group=${ACTUAL_USER}
-WorkingDirectory=${ACTUAL_HOME}
+User=root
+Group=root
+WorkingDirectory=/root
+
+# Remove stale X lock files before every start
 ExecStartPre=/bin/bash -c "/bin/rm -f /tmp/.X%i-lock /tmp/.X11-unix/X%i 2>/dev/null || true"
-ExecStart=/bin/bash -c "/usr/bin/vncserver :%i -geometry ${VNC_GEOM} -depth 24 -localhost no -SecurityTypes VncAuth >> /var/log/vncserver.log 2>&1"
+ExecStart=/bin/bash -c "/usr/bin/vncserver :%i -geometry 1920x1080 -depth 24 -localhost no -SecurityTypes VncAuth >> /var/log/vncserver.log 2>&1"
 ExecStop=/bin/bash -c "/usr/bin/vncserver -kill :%i >> /var/log/vncserver.log 2>&1"
+
 Restart=on-failure
 RestartSec=10
 TimeoutStartSec=60
@@ -553,8 +550,14 @@ SVCEOF
 
   systemctl daemon-reload
   systemctl enable vncserver@1.service
-  msg_ok "VNC service enabled: vncserver@1.service (port 5901)"
-  msg_ok "Connect: $(hostname -I 2>/dev/null | awk '{print $1}'):5901"
+  systemctl start  vncserver@1.service
+  sleep 3
+  if systemctl is-active vncserver@1.service &>/dev/null; then
+    msg_ok "VNC service running on port 5901"
+  else
+    msg_warn "VNC service did not start — check: journalctl -u vncserver@1"
+  fi
+  msg_ok "Connect: $(hostname -I 2>/dev/null | awk '{print $1}'):5901  (pw: VanAwsome1)"
 
   mkdir -p /var/log/journal
   systemd-tmpfiles --create --prefix /var/log/journal >> "$LOGFILE" 2>&1 || true
@@ -627,7 +630,7 @@ EOF
       cat >> "$BOOT_CFG" << EOF
 
 # ── Van Auken Tech Pi Performance Tuning ─────────────────────────────────────
-# Applied by pi-setup.sh v1.1.2 — $(date '+%Y-%m-%d')
+# Applied by pi-setup.sh v1.1.3 — $(date '+%Y-%m-%d')
 gpu_mem=${GPU_MEM}
 camera_auto_detect=0
 display_auto_detect=0
@@ -648,7 +651,7 @@ over_voltage=${OVER_VOLTAGE}
 EOF
         msg_ok "CPU overclock: ${SAFE_FREQ}MHz — active after reboot"
       else
-        msg_warn "No overclock applied (Pi Zero or unknown model)"
+        msg_warn "No overclock applied"
       fi
       msg_ok "Boot config updated: ${BOOT_CFG}"
     else
@@ -839,9 +842,9 @@ verify() {
   echo ""
   printf " ${GN}${BLD}Verified: %d${CL}   ${RD}${BLD}Not Found: %d${CL}\n" "$ok" "$fail"
   echo ""
-  systemctl is-enabled vncserver@1.service &>/dev/null \
-    && msg_ok "VNC service enabled" \
-    || msg_warn "VNC service not enabled — run: sudo systemctl enable vncserver@1"
+  systemctl is-active vncserver@1.service &>/dev/null \
+    && msg_ok "VNC service running (port 5901)" \
+    || msg_warn "VNC not running — check: journalctl -u vncserver@1"
   apt-cache policy snapd 2>/dev/null | grep -q "Candidate: (none)" \
     && msg_ok "snapd blocked at APT layer" \
     || msg_warn "snapd block unconfirmed"
@@ -853,7 +856,7 @@ summary() {
   local vnc_ip; vnc_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
   echo ""
   echo -e "${BL}${BLD} ════════════════════════════════════════════════════════════════${CL}"
-  echo -e "${BL}${BLD} VAN AUKEN TECH RASPBERRY PI SETUP COMPLETE — v1.1.2${CL}"
+  echo -e "${BL}${BLD} VAN AUKEN TECH RASPBERRY PI SETUP COMPLETE — v1.1.3${CL}"
   echo -e "${BL}${BLD} ════════════════════════════════════════════════════════════════${CL}"
   echo ""
   printf " ${GN}${BLD}Installed : %d / %d${CL}\n" "${#INSTALLED[@]}" "$total"
@@ -870,10 +873,10 @@ summary() {
   echo -e "   ${BL}·${CL} All /boot config.txt changes"
   echo ""
   echo -e " ${GN}${BLD}Next Steps:${CL}"
-  echo -e "   ${GN}1.${CL} Reboot:               ${BL}sudo reboot${CL}"
-  echo -e "   ${GN}2.${CL} Connect via VNC:      ${BL}${vnc_ip}:5901${CL}  (pw: VanAwsome1)"
-  echo -e "   ${GN}3.${CL} Change VNC password:  ${BL}vncpasswd${CL}"
-  echo -e "   ${GN}4.${CL} Init Metasploit DB:   ${BL}sudo msfdb init${CL}"
+  echo -e "   ${GN}1.${CL} Connect via VNC NOW:  ${BL}${vnc_ip}:5901${CL}  (pw: VanAwsome1)"
+  echo -e "   ${GN}2.${CL} Change VNC password:  ${BL}vncpasswd${CL}"
+  echo -e "   ${GN}3.${CL} Reboot when ready:    ${BL}sudo reboot${CL}  (activates GPU/overclock)"
+  echo -e "   ${GN}4.${CL} Init Metasploit DB:   ${BL}msfdb init${CL}"
   echo -e "   ${GN}5.${CL} Update nuclei:        ${BL}nuclei -update-templates${CL}"
   echo -e "   ${GN}6.${CL} System info:          ${BL}piinfo${CL}"
   echo ""
