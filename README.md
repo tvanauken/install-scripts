@@ -2,7 +2,7 @@
 
 > Created by: Thomas Van Auken — Van Auken Tech
 
-A collection of Proxmox VE helper and utility scripts for `atlas.mgmt.home.vanauken.tech` and any Proxmox VE host. All scripts share a unified visual identity modelled after the [Proxmox VE Community Scripts](https://community-scripts.org/scripts).
+A collection of helper and utility scripts for Van Auken Tech infrastructure. All scripts share a unified visual identity modelled after the [Proxmox VE Community Scripts](https://community-scripts.org/scripts).
 
 ---
 
@@ -44,6 +44,20 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 
 ---
 
+### 4. Raspberry Pi Setup
+**Directory:** [`pi-setup/`](pi-setup/)
+**Script:** [`pi-setup.sh`](pi-setup/pi-setup.sh)
+
+> ⚠ **RASPBERRY PI ONLY** — Raspbian GNU/Linux (armhf / arm64). NOT compatible with Proxmox VE, Ubuntu, or x86 Debian.
+
+Complete Raspberry Pi setup: **40+ Kali Linux security tools**, **XFCE remote desktop** (TigerVNC on port 5901), and **full performance tuning** (CPU governor, sysctl, overclock, disabled services). Auto-detects Pi model (1/2/3B/3B+/4/5/Zero/Zero 2W) and adapts settings accordingly.
+
+```bash
+sudo bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pi-setup/pi-setup.sh)
+```
+
+---
+
 ## Visual Standard
 
 All scripts share the same Van Auken Tech visual identity:
@@ -59,11 +73,10 @@ All scripts share the same Van Auken Tech visual identity:
 
 ## Requirements
 
-- Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie)
-- Root access
-- Internet connectivity
-- Missing dependencies are auto-installed by each script
+- Scripts 1–3: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
+- Script 4: Raspberry Pi · Raspbian GNU/Linux 12 or 13 · armhf or arm64 · Root access
+- All scripts require internet connectivity. Missing dependencies are auto-installed.
 
 ---
 
-*Van Auken Tech · atlas.mgmt.home.vanauken.tech*
+*Van Auken Tech · Thomas Van Auken*
