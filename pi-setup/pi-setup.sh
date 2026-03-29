@@ -3,7 +3,7 @@
 # Van Auken Tech — Raspberry Pi Setup
 # Kali Linux Security Tools · XFCE Remote Desktop · Performance Tuning
 # Created by: Thomas Van Auken — Van Auken Tech
-# Version: 1.1.1
+# Version: 1.1.2
 # Date: 2026-03-29
 # Repo: https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -62,7 +62,6 @@ INSTALLED=()
 SKIPPED=()
 WARNINGS=()
 
-# Hardware
 PI_MODEL=""
 PI_GEN=0
 PI_RAM=0
@@ -74,7 +73,6 @@ SAFE_FREQ=0
 OVER_VOLTAGE=0
 LOW_RESOURCE=false
 
-# OS identity (set by detect_os)
 OS_ID="unknown"
 OS_CODENAME="unknown"
 OS_PRETTY="Unknown OS"
@@ -83,7 +81,6 @@ OS_IS_UBUNTU=false
 OS_IS_RASPBIAN=false
 OS_IS_DEBIAN=false
 
-# User context
 ACTUAL_USER=""
 ACTUAL_HOME=""
 
@@ -112,8 +109,6 @@ install_pkg() {
   fi
 }
 
-# Download pre-built Go binary from GitHub Releases
-# NEVER compiles on-device — prevents OOM crash on low-RAM Pi models
 download_go_tool() {
   local repo="$1" name="$2" pattern="$3"
   printf "${TAB}${BL}[▸]${CL} Fetching  %-44s" "${name} (${pattern})..."
@@ -154,32 +149,28 @@ header_info() {
    \_/_/ \_\_|\_/_/ \_\___/|_|\_\___||_|\_| |_| |___\___|_||_|
 BANNER
   echo -e "${CL}"
-  echo -e "${DGN} ── Raspberry Pi Setup v1.1.1 — Kali Tools · XFCE Desktop · Performance ──${CL}"
+  echo -e "${DGN} ── Raspberry Pi Setup v1.1.2 — Kali Tools · XFCE Desktop · Performance ──${CL}"
   printf " ${DGN}Host  :${CL} ${BL}%s${CL}\n" "$(hostname -f 2>/dev/null || hostname)"
   printf " ${DGN}Date  :${CL} ${BL}%s${CL}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
   printf " ${DGN}Log   :${CL} ${BL}%s${CL}\n" "$LOGFILE"
   echo ""
-  echo "Van Auken Tech Pi Setup v1.1.1 Log - $(date)" > "$LOGFILE"
+  echo "Van Auken Tech Pi Setup v1.1.2 Log - $(date)" > "$LOGFILE"
 }
 
 # ── Section 1 — Hardware Detection ───────────────────────────────────────────
 detect_hardware() {
   section "Hardware Detection"
-
   PI_MODEL=$(tr -d '\0' < /proc/device-tree/model 2>/dev/null || echo "Unknown Raspberry Pi")
   PI_RAM=$(awk '/MemTotal/{print int($2/1024)}' /proc/meminfo)
   ARCH=$(dpkg --print-architecture 2>/dev/null || echo "unknown")
-
   printf " ${DGN}Model :${CL} ${BL}%s${CL}\n" "$PI_MODEL"
   printf " ${DGN}RAM   :${CL} ${BL}%s MB${CL}\n" "$PI_RAM"
   printf " ${DGN}Arch  :${CL} ${BL}%s${CL}\n" "$ARCH"
-
   case "$ARCH" in
     armhf) GO_ARCH="linux_arm"  ;;
     arm64) GO_ARCH="linux_arm64" ;;
     *)     msg_warn "Unrecognised architecture: $ARCH — Go binaries will be skipped" ;;
   esac
-
   if   echo "$PI_MODEL" | grep -q "Raspberry Pi 5";           then PI_GEN=5; SAFE_FREQ=2800; OVER_VOLTAGE=2
   elif echo "$PI_MODEL" | grep -q "Raspberry Pi 4";           then PI_GEN=4; SAFE_FREQ=1800; OVER_VOLTAGE=2
   elif echo "$PI_MODEL" | grep -q "Raspberry Pi 3 Model B+"; then PI_GEN=3; SAFE_FREQ=1400; OVER_VOLTAGE=0
@@ -190,15 +181,12 @@ detect_hardware() {
   elif echo "$PI_MODEL" | grep -q "Raspberry Pi";             then PI_GEN=1; SAFE_FREQ=0;    OVER_VOLTAGE=0
   else                                                              PI_GEN=0; SAFE_FREQ=0;    OVER_VOLTAGE=0
   fi
-
   if   [[ -f /boot/firmware/config.txt ]]; then BOOT_CFG="/boot/firmware/config.txt"
   elif [[ -f /boot/config.txt ]];          then BOOT_CFG="/boot/config.txt"
   else BOOT_CFG=""; msg_warn "Boot config not found — boot tuning will be skipped"
   fi
-
   [[ $PI_RAM -lt 512 ]] && GPU_MEM=32 || GPU_MEM=16
   [[ $PI_RAM -lt 768 ]] && LOW_RESOURCE=true && msg_warn "Low RAM (${PI_RAM}MB) — VNC geometry reduced to 1280x720"
-
   [[ -n "$BOOT_CFG" ]] && printf " ${DGN}Boot  :${CL} ${BL}%s${CL}\n" "$BOOT_CFG"
   printf " ${DGN}GPU   :${CL} ${BL}%sMB (headless-optimised)${CL}\n" "$GPU_MEM"
   [[ $SAFE_FREQ -gt 0 ]] && printf " ${DGN}OC    :${CL} ${BL}%s MHz (over_voltage=%s)${CL}\n" "$SAFE_FREQ" "$OVER_VOLTAGE"
@@ -208,15 +196,12 @@ detect_hardware() {
 # ── Section 2 — OS Detection ─────────────────────────────────────────────────
 detect_os() {
   section "OS Detection"
-
   if [[ -f /etc/os-release ]]; then
     OS_ID=$(. /etc/os-release       && printf '%s' "${ID:-unknown}")
     OS_CODENAME=$(. /etc/os-release && printf '%s' "${VERSION_CODENAME:-unknown}")
     OS_PRETTY=$(. /etc/os-release   && printf '%s' "${PRETTY_NAME:-Unknown OS}")
-    local id_like
-    id_like=$(. /etc/os-release     && printf '%s' "${ID_LIKE:-}")
+    local id_like; id_like=$(. /etc/os-release && printf '%s' "${ID_LIKE:-}")
   fi
-
   case "$OS_ID" in
     kali)              OS_IS_KALI=true    ;;
     ubuntu)            OS_IS_UBUNTU=true  ;;
@@ -228,46 +213,31 @@ detect_os() {
       echo "$id_like" | grep -q "raspbian" && OS_IS_RASPBIAN=true
       ;;
   esac
-
   if   $OS_IS_KALI;    then printf " ${DGN}OS    :${CL} ${BL}%s (Kali Linux — native tools path)${CL}\n"     "$OS_PRETTY"
   elif $OS_IS_UBUNTU;  then printf " ${DGN}OS    :${CL} ${BL}%s (Ubuntu — universe will be enabled)${CL}\n" "$OS_PRETTY"
   elif $OS_IS_RASPBIAN;then printf " ${DGN}OS    :${CL} ${BL}%s (Raspberry Pi OS)${CL}\n"                    "$OS_PRETTY"
   elif $OS_IS_DEBIAN;  then printf " ${DGN}OS    :${CL} ${BL}%s (Debian)${CL}\n"                            "$OS_PRETTY"
   else                      printf " ${DGN}OS    :${CL} ${YW}%s (untested distro — proceeding)${CL}\n"      "$OS_PRETTY"
   fi
-
   msg_ok "OS detected: ${OS_ID} / ${OS_CODENAME}"
 }
 
 # ── Section 3 — Preflight Checks ─────────────────────────────────────────────
 preflight() {
   section "Preflight Checks"
-
   [[ $EUID -ne 0 ]] && { msg_error "Must run as root: sudo bash <(curl -s URL)"; exit 1; }
   msg_ok "Running as root"
-
   [[ "$ARCH" != "armhf" && "$ARCH" != "arm64" ]] && {
-    msg_error "Unsupported architecture: ${ARCH}"
-    msg_error "Raspberry Pi hardware (armhf or arm64) required"
+    msg_error "Unsupported architecture: ${ARCH} — Raspberry Pi hardware (armhf or arm64) required"
     exit 1
   }
   msg_ok "Architecture: ${ARCH}"
-
-  command -v apt-get >/dev/null 2>&1 || {
-    msg_error "apt-get not found — requires a Debian/Ubuntu-based OS"
-    exit 1
-  }
+  command -v apt-get >/dev/null 2>&1 || { msg_error "apt-get not found — Debian/Ubuntu-based OS required"; exit 1; }
   msg_ok "Package manager: apt"
-
   local free_kb; free_kb=$(df / | awk 'NR==2{print $4}')
   [[ $free_kb -lt 3145728 ]] \
     && msg_warn "Low disk: $(( free_kb/1024 ))MB free (recommend 3GB+)" \
     || msg_ok "Disk space: $(( free_kb/1024/1024 ))GB free"
-
-  # Internet — try multiple endpoints; succeed if any one responds.
-  # A single endpoint (deb.debian.org) fails when DNS is not yet initialised,
-  # e.g. inside systemd-run service scopes at early boot. GitHub is tried first
-  # since the script was just downloaded from there.
   local _net_ok=false
   for _ep in "https://github.com" "https://archive.ubuntu.com" "https://deb.debian.org" "http://1.1.1.1"; do
     curl -fsSL --max-time 5 "$_ep" > /dev/null 2>&1 && _net_ok=true && break
@@ -275,7 +245,6 @@ preflight() {
   unset _ep
   $_net_ok || { msg_error "No internet connectivity — aborting"; exit 1; }
   msg_ok "Internet connectivity confirmed"
-
   ACTUAL_USER="${SUDO_USER:-${USER}}"
   [[ "$ACTUAL_USER" == "root" ]] && \
     ACTUAL_USER=$(getent passwd 1000 2>/dev/null | cut -d: -f1 || echo "root")
@@ -286,7 +255,6 @@ preflight() {
 # ── Section 4 — Snap Prevention ──────────────────────────────────────────────
 prevent_snap() {
   section "Snap Prevention — apt Only Policy"
-
   cat > /etc/apt/preferences.d/99no-snap << 'EOF'
 # Van Auken Tech — apt only, no snap
 Package: snapd
@@ -294,12 +262,10 @@ Pin: release a=*
 Pin-Priority: -1
 EOF
   msg_ok "APT policy: snapd pinned at -1 (permanently blocked)"
-
   if dpkg -l snapd 2>/dev/null | grep -q '^ii'; then
-    msg_info "Removing snapd"
     DEBIAN_FRONTEND=noninteractive apt-get remove --purge -y snapd >> "$LOGFILE" 2>&1 || true
     rm -rf /snap /var/snap /var/lib/snapd /root/snap "${ACTUAL_HOME}/snap" 2>/dev/null || true
-    msg_ok "snapd purged and all snap directories removed"
+    msg_ok "snapd purged"
   else
     msg_ok "snapd not present"
   fi
@@ -308,7 +274,6 @@ EOF
 # ── Section 5 — Reboot Prevention ────────────────────────────────────────────
 prevent_reboot() {
   section "Reboot Prevention"
-
   systemctl stop    unattended-upgrades 2>/dev/null || true
   systemctl disable unattended-upgrades 2>/dev/null || true
   cat > /etc/apt/apt.conf.d/99no-autoreboot << 'EOF'
@@ -317,22 +282,19 @@ Unattended-Upgrade::Automatic-Reboot-WithUsers "false";
 APT::Periodic::Unattended-Upgrade "0";
 EOF
   msg_ok "Auto-reboot disabled"
-
   local kpkgs; kpkgs=$(dpkg-query -W -f='${Package}\n' \
     'linux-image*' 'linux-headers*' 'raspberrypi-kernel*' 2>/dev/null | tr '\n' ' ')
   [[ -n "$kpkgs" ]] && apt-mark hold $kpkgs >> "$LOGFILE" 2>&1 || true
   msg_ok "Kernel packages held — mid-script reboot prevented"
-
   if ! $OS_IS_KALI; then
     apt-mark hold kali-defaults >> "$LOGFILE" 2>&1 || true
-    msg_ok "kali-defaults held (dpkg diversion conflict prevention on non-Kali)"
+    msg_ok "kali-defaults held (dpkg diversion conflict prevention)"
   fi
 }
 
 # ── Section 6 — System Update & Base Dependencies ────────────────────────────
 setup_base() {
   section "System Update & Base Dependencies"
-
   if $OS_IS_UBUNTU; then
     msg_info "Enabling Ubuntu universe and multiverse"
     DEBIAN_FRONTEND=noninteractive apt-get install -y software-properties-common >> "$LOGFILE" 2>&1 || true
@@ -340,16 +302,12 @@ setup_base() {
     add-apt-repository -y multiverse >> "$LOGFILE" 2>&1 || true
     msg_ok "Ubuntu: universe and multiverse enabled"
   fi
-
   msg_info "Running apt-get update"
   DEBIAN_FRONTEND=noninteractive apt-get update -qq >> "$LOGFILE" 2>&1
   msg_ok "Package lists updated"
-
   msg_info "Upgrading packages (kernel held)"
-  DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq \
-    -o Dpkg::Options::="--force-confold" >> "$LOGFILE" 2>&1
+  DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq -o Dpkg::Options::="--force-confold" >> "$LOGFILE" 2>&1
   msg_ok "System packages upgraded"
-
   for pkg in \
     curl wget git gnupg2 apt-transport-https ca-certificates lsb-release \
     build-essential python3 python3-pip python3-venv python3-dev \
@@ -365,37 +323,20 @@ setup_base() {
 # ── Section 7 — Security Tools ───────────────────────────────────────────────
 install_security_tools() {
   section "Security Tools — Distribution Repos"
-
   for pkg in nmap masscan netdiscover arp-scan hping3 fping \
              dnsrecon nbtscan smbclient smbmap \
              snmp snmpd snmp-mibs-downloader onesixtyone \
              netcat-openbsd socat tcpdump tshark wireshark-common \
-             mitmproxy proxychains4; do
+             mitmproxy proxychains4; do install_pkg "$pkg"; done
+  for pkg in nikto sqlmap dirb gobuster wfuzz ffuf whatweb sslscan; do install_pkg "$pkg"; done
+  for pkg in hydra medusa john hashcat crunch cewl; do install_pkg "$pkg"; done
+  for pkg in aircrack-ng reaver pixiewps macchanger rfkill wireless-tools iw; do install_pkg "$pkg"; done
+  for pkg in binwalk foremost testdisk steghide libimage-exiftool-perl gdb gdb-multiarch strace file; do
     install_pkg "$pkg"
   done
-
-  for pkg in nikto sqlmap dirb gobuster wfuzz ffuf whatweb sslscan; do
+  for pkg in recon-ng cherrytree dsniff ettercap-text-only rkhunter chkrootkit lynis tor knockd p0f net-tools htop; do
     install_pkg "$pkg"
   done
-
-  for pkg in hydra medusa john hashcat crunch cewl; do
-    install_pkg "$pkg"
-  done
-
-  for pkg in aircrack-ng reaver pixiewps macchanger rfkill wireless-tools iw; do
-    install_pkg "$pkg"
-  done
-
-  for pkg in binwalk foremost testdisk steghide libimage-exiftool-perl \
-             gdb gdb-multiarch strace file; do
-    install_pkg "$pkg"
-  done
-
-  for pkg in recon-ng cherrytree dsniff ettercap-text-only \
-             rkhunter chkrootkit lynis tor knockd p0f net-tools htop; do
-    install_pkg "$pkg"
-  done
-
   for tool in john lynis chkrootkit netdiscover arp-scan hping3; do
     local src; src=$(find /usr/sbin /sbin -name "$tool" -type f 2>/dev/null | head -1)
     [[ -n "$src" ]] && ln -sf "$src" "/usr/local/bin/$tool" 2>/dev/null || true
@@ -406,12 +347,10 @@ install_security_tools() {
 # ── Section 8 — Python Security Tools ────────────────────────────────────────
 install_python_tools() {
   section "Python Security Tools — /opt/security-venv"
-
   python3 -m venv /opt/security-venv >> "$LOGFILE" 2>&1
   local PIP="/opt/security-venv/bin/pip"
   "$PIP" install --upgrade pip setuptools wheel >> "$LOGFILE" 2>&1
-  msg_ok "Python venv created: /opt/security-venv"
-
+  msg_ok "Python venv: /opt/security-venv"
   for entry in "impacket:impacket" "scapy:scapy" "theHarvester:theHarvester" \
                "dnspython:dnspython" "requests:requests" "paramiko:paramiko" \
                "colorama:colorama" "rich:rich" "beautifulsoup4:beautifulsoup4"; do
@@ -423,10 +362,8 @@ install_python_tools() {
       printf "${YW}⚠ SKIP${CL}\n"; SKIPPED+=("$label (python)")
     fi
   done
-
   for tool in theHarvester theharvester; do
-    [[ -f "/opt/security-venv/bin/$tool" ]] && \
-      ln -sf "/opt/security-venv/bin/$tool" "/usr/local/bin/$tool" 2>/dev/null || true
+    [[ -f "/opt/security-venv/bin/$tool" ]] && ln -sf "/opt/security-venv/bin/$tool" "/usr/local/bin/$tool" 2>/dev/null || true
   done
   for f in /opt/security-venv/bin/impacket-*; do
     [[ -f "$f" ]] && ln -sf "$f" "/usr/local/bin/$(basename "$f")" 2>/dev/null || true
@@ -449,14 +386,11 @@ install_ruby_tools() {
 install_go_binaries() {
   section "Go Security Tools — Pre-Built ARM Binaries"
   echo -e "${TAB}${YW}⚠  Pre-built ${GO_ARCH} binaries — no on-device compilation${CL}\n"
-
   [[ -z "$GO_ARCH" ]] && { msg_warn "No GO_ARCH — Go tools skipped"; return; }
-
   download_go_tool "projectdiscovery/nuclei"    "nuclei"    "$GO_ARCH"
   download_go_tool "projectdiscovery/subfinder" "subfinder" "$GO_ARCH"
   download_go_tool "projectdiscovery/httpx"     "httpx"     "$GO_ARCH"
   download_go_tool "projectdiscovery/naabu"     "naabu"     "$GO_ARCH"
-
   local ferox_pat; [[ "$ARCH" == "arm64" ]] && ferox_pat="aarch64" || ferox_pat="arm"
   download_go_tool "epi052/feroxbuster" "feroxbuster" "$ferox_pat"
 }
@@ -469,7 +403,6 @@ setup_kali_repo() {
     msg_ok "Running on Kali Linux — kali-rolling pre-configured"
     echo -e "${TAB}${YW}⚠  Skipping GPG key + repo addition (already Kali)${CL}\n"
     DEBIAN_FRONTEND=noninteractive apt-get update -qq >> "$LOGFILE" 2>&1
-
     printf "${TAB}${BL}[▸]${CL} Installing %-42s" "metasploit-framework..."
     if command -v msfconsole >/dev/null 2>&1; then
       printf "${GN}✔ Already installed${CL}\n"; INSTALLED+=("metasploit-framework")
@@ -483,7 +416,6 @@ setup_kali_repo() {
   fi
 
   echo -e "${TAB}${YW}⚠  Adding kali-rolling at priority 100 — native packages not overridden${CL}\n"
-
   msg_info "Installing Kali archive signing key"
   if curl -fsSL https://archive.kali.org/archive-key.asc \
     | gpg --dearmor -o /etc/apt/trusted.gpg.d/kali-archive-keyring.gpg 2>> "$LOGFILE"; then
@@ -521,20 +453,30 @@ EOF
     && { printf "${GN}✔ OK${CL}\n"; INSTALLED+=("kali-linux-core"); } \
     || { printf "${YW}⚠ Partial${CL}\n"; SKIPPED+=("kali-linux-core (kali-defaults conflict expected)"); }
 
+  # ── Fully repair dpkg state after kali-linux-core attempt ──────────────────
+  # The `wordlists` package (depends on kali-defaults which is held) gets stuck
+  # in an unpacked-but-not-configured state. This BLOCKS all subsequent apt
+  # operations on the system, including XFCE4 and TigerVNC installation.
+  #
+  # Fix:
+  #   1. Remove cached kali-defaults deb to prevent re-unpack
+  #   2. Force-remove wordlists from dpkg state (rockyou.txt file stays on disk)
+  #   3. Configure any remaining unconfigured packages
+  #   4. Run fix-broken to resolve any remaining dependency issues
   rm -f /var/cache/apt/archives/kali-defaults*.deb 2>/dev/null || true
+  dpkg --remove --force-remove-reinstreq wordlists 2>/dev/null || true
+  dpkg --configure -a 2>/dev/null || true
   DEBIAN_FRONTEND=noninteractive apt-get --fix-broken install -y >> "$LOGFILE" 2>&1 || true
-  msg_ok "Package state repaired"
+  msg_ok "Package state fully repaired (wordlists dpkg entry removed, rockyou.txt preserved on disk)"
 }
 
 # ── Section 12 — Wordlists ────────────────────────────────────────────────────
 setup_wordlists() {
   section "Wordlists"
   mkdir -p /usr/share/wordlists
-
   DEBIAN_FRONTEND=noninteractive apt-get install -y wordlists >> "$LOGFILE" 2>&1 || true
   [[ -f /usr/share/wordlists/rockyou.txt.gz ]] && \
     gunzip -f /usr/share/wordlists/rockyou.txt.gz >> "$LOGFILE" 2>&1 || true
-
   if [[ ! -f /usr/share/wordlists/rockyou.txt ]]; then
     printf "${TAB}${BL}[▸]${CL} Downloading %-40s" "rockyou.txt (134MB)..."
     if curl -fsSL \
@@ -548,8 +490,7 @@ setup_wordlists() {
     local lines; lines=$(wc -l < /usr/share/wordlists/rockyou.txt)
     msg_ok "rockyou.txt: $(printf "%'d" "$lines") passwords"
   fi
-
-  msg_warn "SecLists not auto-installed (1.4GB clone exceeds Pi RAM+swap). Manual:"
+  msg_warn "SecLists not auto-installed (1.4GB exceeds Pi RAM+swap). Manual install:"
   echo -e "${TAB}${DGN}  sudo git clone --depth 1 https://github.com/danielmiessler/SecLists /mnt/external/seclists${CL}"
 }
 
@@ -568,7 +509,6 @@ setup_desktop_and_vnc() {
   msg_ok "VNC geometry: ${VNC_GEOM}"
 
   mkdir -p "${ACTUAL_HOME}/.vnc"
-
   printf 'VanAwsome1\nVanAwsome1\n\n' | vncpasswd "${ACTUAL_HOME}/.vnc/passwd" >> "$LOGFILE" 2>&1 || \
     printf '%s\n' 'VanAwsome1' | vncpasswd -f > "${ACTUAL_HOME}/.vnc/passwd"
   chmod 600 "${ACTUAL_HOME}/.vnc/passwd"
@@ -620,19 +560,16 @@ SVCEOF
   systemd-tmpfiles --create --prefix /var/log/journal >> "$LOGFILE" 2>&1 || true
   systemctl restart systemd-journald 2>/dev/null || true
   msg_ok "Persistent journaling enabled"
-
   ufw allow 5901/tcp >> "$LOGFILE" 2>&1 || true
 }
 
 # ── Section 14 — Performance Tuning ──────────────────────────────────────────
 tune_performance() {
   section "Performance Tuning"
-
   for gov in /sys/devices/system/cpu/cpu[0-9]*/cpufreq/scaling_governor; do
     [[ -f "$gov" ]] && echo "performance" > "$gov" || true
   done
   msg_ok "CPU governor: performance (live)"
-
   cat > /etc/systemd/system/cpu-performance-governor.service << 'EOF'
 [Unit]
 Description=Set CPU Governor to Performance — Van Auken Tech
@@ -645,8 +582,7 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 EOF
   systemctl enable cpu-performance-governor.service >> "$LOGFILE" 2>&1
-  msg_ok "CPU governor persisted via systemd"
-
+  msg_ok "CPU governor persisted"
   cat > /etc/sysctl.d/99-van-auken-pi.conf << 'EOF'
 # Van Auken Tech — Raspberry Pi Performance Tuning
 vm.swappiness = 100
@@ -662,17 +598,14 @@ net.ipv4.tcp_window_scaling = 1
 net.ipv4.tcp_timestamps = 1
 EOF
   sysctl -p /etc/sysctl.d/99-van-auken-pi.conf >> "$LOGFILE" 2>&1
-  msg_ok "Kernel parameters applied (sysctl)"
-
+  msg_ok "Kernel parameters applied"
   local wifi_active=false
   for iface in $(ip link show 2>/dev/null | grep -E "wlan|wifi" | awk '{print $2}' | tr -d ':'); do
     ip link show "$iface" 2>/dev/null | grep -q "state UP" && wifi_active=true && break
   done
-
   local svc_list=("bluetooth" "ModemManager" "avahi-daemon" "colord"
                   "NetworkManager-wait-online" "rpi-eeprom-update" "rtkit-daemon" "lvm2-monitor")
   $wifi_active || svc_list+=("wpa_supplicant")
-
   for svc in "${svc_list[@]}"; do
     if systemctl is-active "$svc" &>/dev/null || systemctl is-enabled "$svc" &>/dev/null; then
       systemctl stop "$svc" 2>/dev/null || true
@@ -681,24 +614,20 @@ EOF
     fi
   done
   $wifi_active && msg_warn "WiFi active — wpa_supplicant kept running"
-
   systemctl --global disable pulseaudio.service pulseaudio.socket 2>/dev/null || true
   pkill -x pulseaudio 2>/dev/null || true
-  msg_ok "Pulseaudio disabled (~19MB RAM freed)"
-
+  msg_ok "Pulseaudio disabled"
   if command -v xfconf-query >/dev/null 2>&1; then
     DISPLAY=:1 xfconf-query -c xfwm4 -p /general/use_compositing -s false 2>/dev/null || true
     msg_ok "XFCE compositor disabled"
   fi
-
   if [[ -n "$BOOT_CFG" ]]; then
     cp "$BOOT_CFG" "${BOOT_CFG}.bak.$(date +%Y%m%d)" 2>/dev/null || true
-
     if ! grep -q "Van Auken Tech Pi Performance" "$BOOT_CFG" 2>/dev/null; then
       cat >> "$BOOT_CFG" << EOF
 
 # ── Van Auken Tech Pi Performance Tuning ─────────────────────────────────────
-# Applied by pi-setup.sh v1.1.1 — $(date '+%Y-%m-%d')
+# Applied by pi-setup.sh v1.1.2 — $(date '+%Y-%m-%d')
 gpu_mem=${GPU_MEM}
 camera_auto_detect=0
 display_auto_detect=0
@@ -710,7 +639,6 @@ EOF
       [[ $PI_GEN -le 4 ]] && sed -i \
         's/^dtoverlay=vc4-kms-v3d/# dtoverlay=vc4-kms-v3d  # disabled by Van Auken Tech pi-setup/' \
         "$BOOT_CFG" 2>/dev/null || true
-
       if [[ $SAFE_FREQ -gt 0 ]]; then
         cat >> "$BOOT_CFG" << EOF
 
@@ -816,7 +744,6 @@ ZSHRCEOF
 
 setup_shell() {
   section "ZSH Shell Environment"
-
   cat > /usr/local/bin/kali-pi-banner << 'BANNERSCRIPT'
 #!/usr/bin/env bash
 RD="\033[01;31m"; YW="\033[33m"; GN="\033[1;92m"
@@ -841,7 +768,6 @@ echo ""
 BANNERSCRIPT
   chmod +x /usr/local/bin/kali-pi-banner
   msg_ok "Login banner: /usr/local/bin/kali-pi-banner"
-
   mkdir -p /etc/zsh
   cat > /etc/zsh/zshrc << 'SYSZSHRC'
 # Van Auken Tech — Raspberry Pi System ZSH
@@ -855,19 +781,15 @@ function clear() {
 }
 SYSZSHRC
   msg_ok "System ZSH: /etc/zsh/zshrc"
-
   write_zshrc "${ACTUAL_HOME}/.zshrc"
   chown "${ACTUAL_USER}:${ACTUAL_USER}" "${ACTUAL_HOME}/.zshrc" 2>/dev/null || true
   chmod 644 "${ACTUAL_HOME}/.zshrc"
   msg_ok ".zshrc: ${ACTUAL_USER}"
-
   write_zshrc /root/.zshrc; chmod 644 /root/.zshrc
   msg_ok ".zshrc: root"
-
   usermod -s /bin/zsh "$ACTUAL_USER" 2>/dev/null || true
   usermod -s /bin/zsh root           2>/dev/null || true
   msg_ok "Default shell: ZSH for ${ACTUAL_USER} and root"
-
   [[ -d /etc/update-motd.d ]] && chmod -x /etc/update-motd.d/* 2>/dev/null || true
   cat > /etc/motd << MOTDEOF
 
@@ -879,7 +801,6 @@ SYSZSHRC
 
 MOTDEOF
   msg_ok "MOTD configured"
-
   echo "$(hostname -f) — Authorized access only" > /etc/issue.net
   grep -q '^#Banner' /etc/ssh/sshd_config 2>/dev/null && \
     sed -i 's|^#Banner.*|Banner /etc/issue.net|' /etc/ssh/sshd_config
@@ -891,7 +812,6 @@ MOTDEOF
 # ── Section 16 — Verification ─────────────────────────────────────────────────
 verify() {
   section "Verification"
-
   local entries=(
     "nmap:nmap" "masscan:masscan" "netdiscover:netdiscover" "arp-scan:arp-scan"
     "hping3:hping3" "tcpdump:tcpdump" "tshark:tshark" "mitmproxy:mitmproxy"
@@ -906,7 +826,6 @@ verify() {
     "rkhunter:rkhunter" "chkrootkit:chkrootkit" "lynis:lynis"
     "vncserver:vncserver" "startxfce4:startxfce4" "zsh:zsh"
   )
-
   local ok=0 fail=0
   for entry in "${entries[@]}"; do
     local label="${entry%%:*}" cmd="${entry##*:}"
@@ -925,7 +844,7 @@ verify() {
     || msg_warn "VNC service not enabled — run: sudo systemctl enable vncserver@1"
   apt-cache policy snapd 2>/dev/null | grep -q "Candidate: (none)" \
     && msg_ok "snapd blocked at APT layer" \
-    || msg_warn "snapd block unconfirmed — check /etc/apt/preferences.d/99no-snap"
+    || msg_warn "snapd block unconfirmed"
 }
 
 # ── Summary ───────────────────────────────────────────────────────────────────
@@ -934,7 +853,7 @@ summary() {
   local vnc_ip; vnc_ip=$(hostname -I 2>/dev/null | awk '{print $1}')
   echo ""
   echo -e "${BL}${BLD} ════════════════════════════════════════════════════════════════${CL}"
-  echo -e "${BL}${BLD} VAN AUKEN TECH RASPBERRY PI SETUP COMPLETE — v1.1.1${CL}"
+  echo -e "${BL}${BLD} VAN AUKEN TECH RASPBERRY PI SETUP COMPLETE — v1.1.2${CL}"
   echo -e "${BL}${BLD} ════════════════════════════════════════════════════════════════${CL}"
   echo ""
   printf " ${GN}${BLD}Installed : %d / %d${CL}\n" "${#INSTALLED[@]}" "$total"
@@ -969,7 +888,6 @@ summary() {
   echo ""
 }
 
-# ── Entry Point ───────────────────────────────────────────────────────────────
 main() {
   header_info
   detect_hardware
