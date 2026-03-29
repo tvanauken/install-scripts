@@ -48,9 +48,13 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 **Directory:** [`pi-setup/`](pi-setup/)
 **Script:** [`pi-setup.sh`](pi-setup/pi-setup.sh)
 
-> ⚠ **RASPBERRY PI ONLY** — Raspbian GNU/Linux (armhf / arm64). NOT compatible with Proxmox VE, Ubuntu, or x86 Debian.
+> ⚠ **RASPBERRY PI HARDWARE ONLY** (armhf / arm64)
+> Supported OS: **Raspberry Pi OS**, **Ubuntu Desktop/Server**, **Kali Linux ARM**, **Debian ARM**
+> NOT compatible with Proxmox VE or x86/x86_64 systems.
+>
+> **IMPORTANT:** Must be run with `sudo bash <(curl -s URL)` — not curl alone.
 
-Complete Raspberry Pi setup: **40+ Kali Linux security tools**, **XFCE remote desktop** (TigerVNC on port 5901), and **full performance tuning** (CPU governor, sysctl, overclock, disabled services). Auto-detects Pi model (1/2/3B/3B+/4/5/Zero/Zero 2W) and adapts settings accordingly.
+Complete Raspberry Pi setup: **40+ Kali Linux security tools**, **XFCE remote desktop** (TigerVNC on port 5901), and **full performance tuning** (CPU governor, sysctl, overclock, disabled services). Auto-detects Pi model (Pi 1/2/3B/3B+/4/5/Zero/Zero 2W) AND OS (Raspberry Pi OS / Ubuntu / Kali / Debian) and adapts all settings accordingly. **apt only — snapd explicitly blocked.**
 
 ```bash
 sudo bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pi-setup/pi-setup.sh)
@@ -74,7 +78,7 @@ All scripts share the same Van Auken Tech visual identity:
 ## Requirements
 
 - Scripts 1–3: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
-- Script 4: Raspberry Pi · Raspbian GNU/Linux 12 or 13 · armhf or arm64 · Root access
+- Script 4: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
 - All scripts require internet connectivity. Missing dependencies are auto-installed.
 
 ---
