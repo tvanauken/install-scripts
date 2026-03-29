@@ -6,9 +6,9 @@
 
 ## What This Repository Is
 
-A collection of custom scripts for Van Auken Tech infrastructure, all adhering to the **Van Auken Tech standard** for script design and visual presentation. Every script in this collection shares a unified look, feel, and behaviour so that any operator familiar with one script is immediately comfortable running any other.
+A collection of custom scripts for Van Auken Tech infrastructure, all adhering to the **Van Auken Tech standard** for script design and visual presentation. Every script in this collection shares a unified look, feel, and behaviour.
 
-Scripts 1–3 are modelled after the [Proxmox VE Community Scripts](https://community-scripts.org/scripts) and are designed for Proxmox VE hosts. Script 4 targets Raspberry Pi specifically.
+Scripts 1–3 target Proxmox VE hosts. Script 4 targets Raspberry Pi hardware.
 
 ---
 
@@ -21,13 +21,15 @@ Scripts 1–3 are modelled after the [Proxmox VE Community Scripts](https://comm
 | 3 | Drive Inventory Generator | [`drive-inventory/`](../drive-inventory/) | Proxmox VE | Scans all drives, generates markdown inventory report |
 | 4 | **Raspberry Pi Setup** | [`pi-setup/`](../pi-setup/) | **Raspberry Pi** | Kali tools + XFCE desktop + performance tuning |
 
-> ⚠ Script 4 is **RASPBERRY PI ONLY** — armhf/arm64 Raspbian. Not compatible with Proxmox VE or x86 systems.
+> ⚠ Script 4 requires **Raspberry Pi hardware** (armhf/arm64). Supported OS: Raspberry Pi OS, Ubuntu Desktop/Server, Kali Linux ARM, Debian ARM.
+> NOT compatible with Proxmox VE or x86/x86_64 systems.
+> Must be run with `sudo bash <(curl -s URL)` — not curl alone.
 
 ---
 
 ## The Van Auken Tech Standard
 
-Every script in this collection must conform to the following standard.
+Every script must conform to the following:
 
 ### Visual Identity
 
@@ -59,6 +61,7 @@ Every script in this collection must conform to the following standard.
 | Dependency install | Missing tools auto-installed via `apt-get` |
 | Log file | Every script writes a timestamped log |
 | Non-interactive apt | Always `DEBIAN_FRONTEND=noninteractive apt-get install -y` |
+| No snap | snapd is never used; blocked at apt layer where applicable |
 | Attribution | Script header comment includes author, version, date, repo URL |
 
 ### Documentation Standard
@@ -71,8 +74,10 @@ Every script directory must contain:
 ├── README.md              — short overview + one-liner usage command
 └── docs/
     ├── user-manual.md     — comprehensive user guide
-    └── build-log.md       — action log from creation and testing
+    └── build-log.md       — full action log from creation, testing, and all changes
 ```
+
+**Any change to a script requires immediate updates to ALL documentation files.**
 
 ---
 
@@ -95,7 +100,7 @@ install-scripts/
 │   ├── generate_drive_inventory.sh
 │   ├── README.md
 │   └── docs/
-└── pi-setup/              ⚠ RASPBERRY PI ONLY
+└── pi-setup/              ⚠ RASPBERRY PI HARDWARE — armhf/arm64 only
     ├── pi-setup.sh
     ├── README.md
     └── docs/
@@ -125,7 +130,8 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 sudo bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pi-setup/pi-setup.sh)
 ```
 
-> **Note:** These one-liners require the repository to be set to **Public** in GitHub settings.
+> **Note:** The pi-setup one-liner requires `sudo bash <(...)` — not bare curl.
+> All one-liners require the repository to be set to **Public** in GitHub settings.
 
 ---
 
