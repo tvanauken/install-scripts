@@ -2,7 +2,7 @@
 # ============================================================================
 #  Nginx Proxy Manager — Post-Install Configuration
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    1.0.0
+#  Version:    1.1.0
 #  Date:       2026-03-31
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -91,10 +91,15 @@ preflight() {
 collect_config() {
   section "Configuration"
 
-  echo -e "  ${BL}${BLD}Before continuing, confirm:${CL}"
-  printf "  ${DGN}[▸]${CL}  Nginx Proxy Manager LXC is deployed and running\n"
-  printf "  ${DGN}[▸]${CL}  Web UI is reachable on port 81\n"
-  printf "  ${DGN}[▸]${CL}  No admin account has been created yet\n"
+  echo -e "  ${BL}${BLD}About admin credentials:${CL}"
+  echo ""
+  printf "  ${GN}[▸]${CL}  ${BLD}Fresh install (web UI setup wizard never opened):${CL}\n"
+  printf "        Enter the email and password you WANT to create.\n"
+  printf "        This script creates the admin account via the API automatically.\n"
+  echo ""
+  printf "  ${YW}[▸]${CL}  ${BLD}Already completed the NPM web UI setup wizard:${CL}\n"
+  printf "        Enter the email and password you already set up.\n"
+  printf "        The script will skip account creation and log in directly.\n"
   echo ""
 
   read -rp "  ${BL}NPM LXC IP address${CL}: " NPM_IP
@@ -156,8 +161,8 @@ wait_for_service() {
 
 # ── Create Admin Account ──────────────────────────────────────────────────────
 create_admin() {
-  section "Creating Admin Account"
-  msg_info "Creating account: ${ADMIN_EMAIL}"
+  section "Admin Account"
+  msg_info "Attempting to create account: ${ADMIN_EMAIL}"
 
   local payload
   payload=$(jq -n \
@@ -181,7 +186,9 @@ create_admin() {
   if [[ -z "$error" ]]; then
     msg_ok "Admin account created: ${ADMIN_EMAIL}"
   else
-    msg_warn "Account creation: ${error} — will attempt login with provided credentials"
+    # Account already exists — normal if web UI wizard was completed first
+    msg_ok "Account already exists — logging in with provided credentials"
+    echo "Note: ${error}" >> "$LOGFILE"
   fi
 }
 
@@ -210,6 +217,7 @@ get_token() {
 
   if [[ -n "$error" ]]; then
     msg_error "Authentication failed: ${error}"
+    msg_error "If you used the NPM web UI wizard first, make sure you entered those exact credentials above"
     exit 1
   fi
 

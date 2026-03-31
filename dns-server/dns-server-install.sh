@@ -2,7 +2,7 @@
 # ============================================================================
 #  Technitium DNS Server — Post-Install Configuration
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    1.0.0
+#  Version:    1.1.0
 #  Date:       2026-03-31
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -92,16 +92,21 @@ preflight() {
 collect_config() {
   section "Configuration"
 
-  echo -e "  ${BL}${BLD}Before continuing, confirm:${CL}"
-  printf "  ${DGN}[▸]${CL}  Technitium DNS LXC is deployed and running\n"
-  printf "  ${DGN}[▸]${CL}  Web UI is reachable on port 5380\n"
-  printf "  ${DGN}[▸]${CL}  No admin account has been created yet\n"
+  echo -e "  ${BL}${BLD}About admin credentials:${CL}"
+  echo ""
+  printf "  ${GN}[▸]${CL}  ${BLD}Fresh install (web UI never opened):${CL}\n"
+  printf "        Enter the username and password you WANT to create.\n"
+  printf "        This script creates the account via the API automatically.\n"
+  echo ""
+  printf "  ${YW}[▸]${CL}  ${BLD}Already completed the web UI setup wizard:${CL}\n"
+  printf "        Enter the username and password you already set up.\n"
+  printf "        The script will skip account creation and log in directly.\n"
   echo ""
 
   read -rp "  ${BL}Technitium LXC IP address${CL}: " DNS_IP
   [[ -z "$DNS_IP" ]] && { msg_error "IP address is required"; exit 1; }
 
-  read -rp "  ${BL}Admin username to create${CL} [admin]: " DNS_USER
+  read -rp "  ${BL}Admin username${CL} [admin]: " DNS_USER
   DNS_USER="${DNS_USER:-admin}"
 
   while true; do
@@ -114,10 +119,9 @@ collect_config() {
   read -rp "  ${BL}Primary internal zone${CL} (e.g. home.vanauken.tech): " PRIMARY_ZONE
   [[ -z "$PRIMARY_ZONE" ]] && { msg_error "Primary zone is required"; exit 1; }
 
-  read -rp "  ${BL}Additional zones${CL} (comma-separated, or press Enter to skip): " extra_input
+  read -rp "  ${BL}Additional zones${CL} (comma-separated, or Enter to skip): " extra_input
   if [[ -n "$extra_input" ]]; then
     IFS=',' read -ra EXTRA_ZONES <<< "$extra_input"
-    # Strip whitespace from each zone name
     for i in "${!EXTRA_ZONES[@]}"; do
       EXTRA_ZONES[$i]="${EXTRA_ZONES[$i]//[[:space:]]/}"
     done
@@ -154,8 +158,8 @@ wait_for_service() {
 
 # ── Create Admin Account ──────────────────────────────────────────────────────
 create_account() {
-  section "Creating Admin Account"
-  msg_info "Creating account: ${DNS_USER}"
+  section "Admin Account"
+  msg_info "Attempting to create account: ${DNS_USER}"
 
   local response
   response=$(curl -s -X POST \
@@ -175,7 +179,9 @@ create_account() {
   else
     local err
     err=$(echo "$response" | jq -r '.errorMessage // .error // "unknown"' 2>/dev/null)
-    msg_warn "Account creation returned: ${err} — will attempt login with provided credentials"
+    # Account already exists — normal if web UI was used first
+    msg_ok "Account already exists — logging in with provided credentials"
+    echo "Note: ${err}" >> "$LOGFILE"
   fi
 }
 
@@ -201,6 +207,7 @@ get_token() {
     local err
     err=$(echo "$response" | jq -r '.errorMessage // .error // "Login failed"' 2>/dev/null)
     msg_error "Authentication failed: ${err}"
+    msg_error "If you already set up an account via the web UI, make sure you entered those exact credentials above"
     exit 1
   fi
 
