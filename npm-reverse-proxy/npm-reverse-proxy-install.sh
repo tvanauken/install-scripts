@@ -1,12 +1,16 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  Nginx Proxy Manager — LXC Installer for Proxmox VE
+#  Nginx Proxy Manager — Post-Install Configuration
 #  Created by: Thomas Van Auken — Van Auken Tech
 #  Version:    1.0.0
 #  Date:       2026-03-31
 #  Repo:       https://github.com/tvanauken/install-scripts
-#  Source:     https://community-scripts.org/scripts?id=nginxproxymanager
 # ============================================================================
+# Run this script AFTER deploying the Nginx Proxy Manager LXC from:
+#   https://community-scripts.org/scripts?id=nginxproxymanager
+# ============================================================================
+
+set -o pipefail
 
 # ── Colour Palette ────────────────────────────────────────────────────────────
 RD="\033[01;31m"
@@ -19,8 +23,15 @@ BLD="\033[1m"
 TAB="    "
 
 # ── Globals ───────────────────────────────────────────────────────────────────
-LOGFILE="/var/log/npm-reverse-proxy-install-$(date +%Y%m%d-%H%M%S).log"
-COMMUNITY_SCRIPT="https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/nginxproxymanager.sh"
+LOGFILE="/var/log/npm-config-$(date +%Y%m%d-%H%M%S).log"
+API_TOKEN=""
+NPM_IP=""
+ADMIN_NAME=""
+ADMIN_EMAIL=""
+ADMIN_PASS=""
+CERT_CRT=""
+CERT_KEY=""
+CERT_NAME=""
 
 # ── Trap / Cleanup ────────────────────────────────────────────────────────────
 cleanup() {
@@ -32,7 +43,7 @@ trap cleanup EXIT
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 msg_info()  { printf "${TAB}${YW}◆  %s...${CL}\r" "$1"; }
-msg_ok()    { printf "${TAB}${GN}✔  %-50s${CL}\n" "$1"; }
+msg_ok()    { printf "${TAB}${GN}✔  %-55s${CL}\n" "$1"; }
 msg_error() { printf "${TAB}${RD}✘  %s${CL}\n" "$1"; }
 msg_warn()  { printf "${TAB}${YW}⚠  %s${CL}\n" "$1"; }
 section()   { printf "\n${BL}${BLD}  ── %s ──────────────────────────────────────────${CL}\n\n" "$1"; }
@@ -48,106 +59,227 @@ header_info() {
     \_/_/ \_\_|\_/_/ \_\___/|_|\_\___|_|\_|   |_| |___\___|_||_|
 BANNER
   echo -e "${CL}"
-  echo -e "${DGN}  ── Nginx Proxy Manager — LXC Installer for Proxmox VE ─────────────${CL}"
+  echo -e "${DGN}  ── Nginx Proxy Manager — Post-Install Configuration ────────────────${CL}"
   printf "  ${DGN}Host   :${CL}  ${BL}%s${CL}\n" "$(hostname -f 2>/dev/null || hostname)"
   printf "  ${DGN}Date   :${CL}  ${BL}%s${CL}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
   printf "  ${DGN}Log    :${CL}  ${BL}%s${CL}\n" "$LOGFILE"
   echo ""
-  echo "NPM Reverse Proxy Install Log - $(date)" > "$LOGFILE"
+  echo "NPM Post-Install Config Log - $(date)" > "$LOGFILE"
 }
 
 # ── Preflight ─────────────────────────────────────────────────────────────────
 preflight() {
   section "Preflight Checks"
-
   if [[ $EUID -ne 0 ]]; then
-    msg_error "Must be run as root on Proxmox VE host — aborting"
+    msg_error "Must be run as root — aborting"
     exit 1
   fi
   msg_ok "Running as root"
 
-  if ! command -v pveversion &>/dev/null; then
-    msg_error "This script must be run on a Proxmox VE host — aborting"
+  for tool in curl jq; do
+    if ! command -v "$tool" &>/dev/null; then
+      msg_info "Installing ${tool}"
+      DEBIAN_FRONTEND=noninteractive apt-get install -y "$tool" >> "$LOGFILE" 2>&1
+      msg_ok "${tool} installed"
+    else
+      msg_ok "${tool} available"
+    fi
+  done
+}
+
+# ── Collect Configuration ─────────────────────────────────────────────────────
+collect_config() {
+  section "Configuration"
+
+  echo -e "  ${BL}${BLD}Before continuing, confirm:${CL}"
+  printf "  ${DGN}[▸]${CL}  Nginx Proxy Manager LXC is deployed and running\n"
+  printf "  ${DGN}[▸]${CL}  Web UI is reachable on port 81\n"
+  printf "  ${DGN}[▸]${CL}  No admin account has been created yet\n"
+  echo ""
+
+  read -rp "  ${BL}NPM LXC IP address${CL}: " NPM_IP
+  [[ -z "$NPM_IP" ]] && { msg_error "IP address is required"; exit 1; }
+
+  read -rp "  ${BL}Admin full name${CL}: " ADMIN_NAME
+  [[ -z "$ADMIN_NAME" ]] && ADMIN_NAME="Administrator"
+
+  read -rp "  ${BL}Admin email address${CL}: " ADMIN_EMAIL
+  [[ -z "$ADMIN_EMAIL" ]] && { msg_error "Admin email is required"; exit 1; }
+
+  while true; do
+    read -rsp "  ${BL}Admin password${CL}: " ADMIN_PASS; echo ""
+    read -rsp "  ${BL}Confirm password${CL}: " PASS_CONFIRM; echo ""
+    [[ "$ADMIN_PASS" == "$PASS_CONFIRM" ]] && break
+    msg_warn "Passwords do not match — try again"
+  done
+
+  echo ""
+  echo -e "  ${BL}${BLD}Wildcard SSL Certificate — press Enter to skip:${CL}"
+  read -rp "  ${BL}Path to .crt file${CL}: " CERT_CRT
+  if [[ -n "$CERT_CRT" ]]; then
+    if [[ ! -f "$CERT_CRT" ]]; then
+      msg_warn "File not found: ${CERT_CRT} — skipping cert import"
+      CERT_CRT=""
+    else
+      read -rp "  ${BL}Path to .key file${CL}: " CERT_KEY
+      if [[ ! -f "$CERT_KEY" ]]; then
+        msg_warn "File not found: ${CERT_KEY} — skipping cert import"
+        CERT_CRT=""
+        CERT_KEY=""
+      else
+        read -rp "  ${BL}Certificate friendly name${CL} [Wildcard Certificate]: " CERT_NAME
+        CERT_NAME="${CERT_NAME:-Wildcard Certificate}"
+      fi
+    fi
+  fi
+
+  echo ""
+  msg_ok "Configuration collected"
+}
+
+# ── Wait for Service ──────────────────────────────────────────────────────────
+wait_for_service() {
+  section "Connectivity Check"
+  msg_info "Checking http://${NPM_IP}:81"
+  local attempts=0 max=30
+  while (( attempts < max )); do
+    if curl -s --connect-timeout 2 "http://${NPM_IP}:81/api" &>/dev/null; then
+      msg_ok "Nginx Proxy Manager is reachable at http://${NPM_IP}:81"
+      return 0
+    fi
+    (( attempts++ ))
+    sleep 2
+  done
+  msg_error "NPM not reachable after ${max} attempts — is the LXC running and port 81 open?"
+  exit 1
+}
+
+# ── Create Admin Account ──────────────────────────────────────────────────────
+create_admin() {
+  section "Creating Admin Account"
+  msg_info "Creating account: ${ADMIN_EMAIL}"
+
+  local payload
+  payload=$(jq -n \
+    --arg name "$ADMIN_NAME" \
+    --arg email "$ADMIN_EMAIL" \
+    --arg pass "$ADMIN_PASS" \
+    '{name: $name, nickname: "Admin", email: $email, password: $pass, is_disabled: false, roles: ["admin"]}')
+
+  local response
+  response=$(curl -s -X POST \
+    "http://${NPM_IP}:81/api/users" \
+    -H "Content-Type: application/json" \
+    -d "$payload" \
+    2>>"$LOGFILE")
+
+  echo "Create admin response: ${response:0:300}" >> "$LOGFILE"
+
+  local error
+  error=$(echo "$response" | jq -r '.error // empty' 2>/dev/null)
+
+  if [[ -z "$error" ]]; then
+    msg_ok "Admin account created: ${ADMIN_EMAIL}"
+  else
+    msg_warn "Account creation: ${error} — will attempt login with provided credentials"
+  fi
+}
+
+# ── Authenticate ──────────────────────────────────────────────────────────────
+get_token() {
+  section "Authenticating"
+  msg_info "Logging in as ${ADMIN_EMAIL}"
+
+  local payload
+  payload=$(jq -n \
+    --arg identity "$ADMIN_EMAIL" \
+    --arg secret "$ADMIN_PASS" \
+    '{identity: $identity, secret: $secret}')
+
+  local response
+  response=$(curl -s -X POST \
+    "http://${NPM_IP}:81/api/tokens" \
+    -H "Content-Type: application/json" \
+    -d "$payload" \
+    2>>"$LOGFILE")
+
+  echo "Login response: ${response:0:300}" >> "$LOGFILE"
+
+  local error
+  error=$(echo "$response" | jq -r '.error // empty' 2>/dev/null)
+
+  if [[ -n "$error" ]]; then
+    msg_error "Authentication failed: ${error}"
     exit 1
   fi
-  msg_ok "Proxmox VE host confirmed: $(pveversion | cut -d/ -f2)"
 
-  if ! ping -c1 -W3 8.8.8.8 &>/dev/null; then
-    msg_warn "No internet connectivity detected — installation may fail"
+  API_TOKEN=$(echo "$response" | jq -r '.token // empty' 2>/dev/null)
+
+  if [[ -z "$API_TOKEN" ]]; then
+    msg_error "Failed to retrieve API token from response"
+    exit 1
+  fi
+
+  msg_ok "Authenticated — token acquired"
+}
+
+# ── Import Wildcard Certificate ───────────────────────────────────────────────
+import_cert() {
+  [[ -z "$CERT_CRT" || -z "$CERT_KEY" ]] && return
+
+  section "Importing Wildcard SSL Certificate"
+  msg_info "Uploading: ${CERT_NAME}"
+
+  local response
+  response=$(curl -s -X POST \
+    "http://${NPM_IP}:81/api/nginx/certificates" \
+    -H "Authorization: Bearer ${API_TOKEN}" \
+    -F "certificate=@${CERT_CRT}" \
+    -F "certificate_key=@${CERT_KEY}" \
+    -F "nice_name=${CERT_NAME}" \
+    -F "provider=other" \
+    2>>"$LOGFILE")
+
+  echo "Import cert response: ${response:0:300}" >> "$LOGFILE"
+
+  local cert_id
+  cert_id=$(echo "$response" | jq -r '.id // empty' 2>/dev/null)
+  local error
+  error=$(echo "$response" | jq -r '.error // empty' 2>/dev/null)
+
+  if [[ -n "$cert_id" ]]; then
+    msg_ok "Certificate imported: ${CERT_NAME} (ID: ${cert_id})"
   else
-    msg_ok "Internet connectivity confirmed"
+    msg_warn "Certificate import: ${error:-see log for details}"
   fi
-
-  if ! command -v curl &>/dev/null; then
-    msg_info "Installing curl"
-    DEBIAN_FRONTEND=noninteractive apt-get install -y curl >> "$LOGFILE" 2>&1
-    msg_ok "curl installed"
-  else
-    msg_ok "curl available"
-  fi
-}
-
-# ── LXC Specs Preview ─────────────────────────────────────────────────────────
-show_specs() {
-  section "LXC Container Specifications"
-  echo -e "  ${BL}${BLD}Default LXC settings (changeable via Advanced mode during install):${CL}"
-  echo ""
-  printf "  ${DGN}OS           :${CL}  ${BL}Debian 12 (Bookworm)${CL}\n"
-  printf "  ${DGN}CPU          :${CL}  ${BL}2 vCPU${CL}\n"
-  printf "  ${DGN}RAM          :${CL}  ${BL}2048 MB${CL}\n"
-  printf "  ${DGN}Storage      :${CL}  ${BL}8 GB${CL}\n"
-  printf "  ${DGN}Web UI       :${CL}  ${BL}http://<LXC-IP>:81${CL}\n"
-  printf "  ${DGN}Source       :${CL}  ${BL}community-scripts.org/scripts?id=nginxproxymanager${CL}\n"
-  echo ""
-  msg_warn "The community script will prompt for LXC settings — press Enter for defaults or choose Advanced to customise"
-  echo ""
-}
-
-# ── Run Community Script ──────────────────────────────────────────────────────
-run_installer() {
-  section "Running Community Script — Nginx Proxy Manager LXC"
-  echo -e "  ${YW}Launching:${CL}  ${BL}${COMMUNITY_SCRIPT}${CL}"
-  echo ""
-  echo "Launching community script: $COMMUNITY_SCRIPT" >> "$LOGFILE"
-  bash -c "$(curl -fsSL "${COMMUNITY_SCRIPT}")"
-  local exit_code=$?
-  echo "Community script exited with code ${exit_code}" >> "$LOGFILE"
-  if [[ $exit_code -ne 0 ]]; then
-    msg_error "Community script exited with error code ${exit_code} — check output above"
-    exit $exit_code
-  fi
-}
-
-# ── Post-Install Notes ────────────────────────────────────────────────────────
-post_install_notes() {
-  section "Post-Install Reference"
-  echo -e "  ${GN}${BLD}Nginx Proxy Manager LXC container has been deployed.${CL}"
-  echo ""
-  echo -e "  ${BL}${BLD}Access the Web UI:${CL}"
-  printf "  ${TAB}http://<LXC-IP>:81\n"
-  echo ""
-  echo -e "  ${BL}${BLD}First-launch setup wizard:${CL}"
-  printf "  ${DGN}[▸]${CL}  Navigate to http://<LXC-IP>:81\n"
-  printf "  ${DGN}[▸]${CL}  Complete the admin account creation wizard (no default credentials)\n"
-  printf "  ${DGN}[▸]${CL}  Add a Proxy Host — map your domain to a backend service IP:port\n"
-  printf "  ${DGN}[▸]${CL}  Request an SSL certificate via Let's Encrypt, or upload a wildcard cert\n"
-  printf "  ${DGN}[▸]${CL}  Enable Force SSL and HTTP/2 on each proxy host\n"
-  echo ""
-  echo -e "  ${BL}${BLD}Optional certbot DNS plugins (run inside the NPM LXC):${CL}"
-  printf "  ${DGN}[▸]${CL}  /app/scripts/install-certbot-plugins  — installs common DNS provider certbot plugins\n"
-  echo ""
-  echo -e "  ${YW}Full documentation:${CL}  https://github.com/tvanauken/install-scripts/tree/main/npm-reverse-proxy/docs"
-  echo ""
 }
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 summary() {
+  local cert_status
+  if [[ -n "$CERT_CRT" ]]; then
+    cert_status="${CERT_NAME} imported"
+  else
+    cert_status="Not imported — add via Web UI"
+  fi
+
   echo ""
   echo -e "${BL}${BLD}  ════════════════════════════════════════════════════════════════${CL}"
-  echo -e "${BL}${BLD}       DEPLOYMENT COMPLETE — Nginx Proxy Manager${CL}"
+  echo -e "${BL}${BLD}       CONFIGURATION COMPLETE — Nginx Proxy Manager${CL}"
   echo -e "${BL}${BLD}  ════════════════════════════════════════════════════════════════${CL}"
   echo ""
-  echo -e "  ${GN}${BLD}Nginx Proxy Manager LXC container created and running.${CL}"
+  echo -e "  ${GN}${BLD}Nginx Proxy Manager configured successfully.${CL}"
+  echo ""
+  printf "  ${DGN}Server     :${CL}  ${BL}http://${NPM_IP}:81${CL}\n"
+  printf "  ${DGN}Admin      :${CL}  ${BL}${ADMIN_EMAIL}${CL}\n"
+  printf "  ${DGN}SSL Cert   :${CL}  ${BL}${cert_status}${CL}\n"
+  echo ""
+  echo -e "  ${YW}Next steps:${CL}"
+  printf "  ${DGN}[▸]${CL}  Open http://${NPM_IP}:81 and log in\n"
+  printf "  ${DGN}[▸]${CL}  Add Proxy Hosts: Hosts → Proxy Hosts → Add Proxy Host\n"
+  printf "  ${DGN}[▸]${CL}  Assign your SSL certificate to each proxy host\n"
+  printf "  ${DGN}[▸]${CL}  Enable Force SSL and HTTP/2 on each proxy host\n"
+  echo ""
   echo -e "  ${YW}Log file : ${LOGFILE}${CL}"
   echo ""
   echo -e "${DGN}${BLD}  ────────────────────────────────────────────────────────────────${CL}"
@@ -162,9 +294,11 @@ summary() {
 main() {
   header_info
   preflight
-  show_specs
-  run_installer
-  post_install_notes
+  collect_config
+  wait_for_service
+  create_admin
+  get_token
+  import_cert
   summary
 }
 
