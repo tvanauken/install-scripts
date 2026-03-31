@@ -62,11 +62,14 @@ sudo bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/
 
 ---
 
-### 5. Technitium DNS Server
+### 5. Technitium DNS Server — Post-Install Configuration
 **Directory:** [`dns-server/`](dns-server/)
 **Script:** [`dns-server-install.sh`](dns-server/dns-server-install.sh)
 
-Deploys a **Technitium DNS Server** LXC container on Proxmox VE via the [Proxmox VE Community Scripts](https://community-scripts.org/scripts?id=technitiumdns). Technitium is a privacy-focused, open-source DNS server with web UI supporting recursive resolution, split-horizon DNS, authoritative zones, DoH/DoT, DNSSEC, blocklists, and RFC 2136 dynamic updates.
+> **Step 1:** Install the LXC from [community-scripts.org/scripts?id=technitiumdns](https://community-scripts.org/scripts?id=technitiumdns)
+> **Step 2:** Run this script to configure it.
+
+Configures a running **Technitium DNS Server** LXC via the API: creates the admin account, enables recursion, sets upstream forwarders, creates internal zones, and enables RFC 2136 dynamic updates.
 
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/dns-server-install.sh)
@@ -74,11 +77,14 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 
 ---
 
-### 6. Nginx Proxy Manager
+### 6. Nginx Proxy Manager — Post-Install Configuration
 **Directory:** [`npm-reverse-proxy/`](npm-reverse-proxy/)
 **Script:** [`npm-reverse-proxy-install.sh`](npm-reverse-proxy/npm-reverse-proxy-install.sh)
 
-Deploys an **Nginx Proxy Manager** LXC container on Proxmox VE via the [Proxmox VE Community Scripts](https://community-scripts.org/scripts?id=nginxproxymanager). NPM provides a web-based reverse proxy manager backed by OpenResty/Nginx with SSL certificate management, domain-to-service routing, access control, and HTTP/2 support.
+> **Step 1:** Install the LXC from [community-scripts.org/scripts?id=nginxproxymanager](https://community-scripts.org/scripts?id=nginxproxymanager)
+> **Step 2:** Run this script to configure it.
+
+Configures a running **Nginx Proxy Manager** LXC via the API: creates the admin account, authenticates, and imports a wildcard SSL certificate.
 
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
@@ -103,7 +109,7 @@ All scripts share the same Van Auken Tech visual identity:
 
 - Scripts 1–3: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
 - Script 4: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
-- Scripts 5–6: Proxmox VE 8.x or 9.x · Root access · Run from Proxmox VE shell
+- Scripts 5–6: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
 - All scripts require internet connectivity. Missing dependencies are auto-installed.
 
 ---

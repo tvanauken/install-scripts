@@ -8,7 +8,7 @@
 
 A collection of custom scripts for Van Auken Tech infrastructure, all adhering to the **Van Auken Tech standard** for script design and visual presentation. Every script in this collection shares a unified look, feel, and behaviour.
 
-Scripts 1–3 target Proxmox VE hosts directly. Script 4 targets Raspberry Pi hardware. Scripts 5–6 deploy Proxmox VE LXC containers via the community-scripts.org wrappers.
+Scripts 1–3 target Proxmox VE hosts directly. Script 4 targets Raspberry Pi hardware. Scripts 5–6 configure already-deployed LXC containers — install the LXC first from community-scripts.org, then run the script.
 
 ---
 
@@ -20,14 +20,14 @@ Scripts 1–3 target Proxmox VE hosts directly. Script 4 targets Raspberry Pi ha
 | 2 | PVE Drive Cleanup & Init | [`pve-drive-init/`](../pve-drive-init/) | Proxmox VE | Wipes drives with remnant data for fresh deployment |
 | 3 | Drive Inventory Generator | [`drive-inventory/`](../drive-inventory/) | Proxmox VE | Scans all drives, generates markdown inventory report |
 | 4 | **Raspberry Pi Setup** | [`pi-setup/`](../pi-setup/) | **Raspberry Pi** | Kali tools + XFCE desktop + performance tuning |
-| 5 | Technitium DNS Server | [`dns-server/`](../dns-server/) | Proxmox VE (LXC) | Deploys Technitium DNS Server LXC container |
-| 6 | Nginx Proxy Manager | [`npm-reverse-proxy/`](../npm-reverse-proxy/) | Proxmox VE (LXC) | Deploys Nginx Proxy Manager LXC container |
+| 5 | Technitium DNS Server | [`dns-server/`](../dns-server/) | LXC (post-install) | Configures Technitium DNS via API after LXC is deployed |
+| 6 | Nginx Proxy Manager | [`npm-reverse-proxy/`](../npm-reverse-proxy/) | LXC (post-install) | Configures NPM via API after LXC is deployed |
 
 > ⚠ Script 4 requires **Raspberry Pi hardware** (armhf/arm64). Supported OS: Raspberry Pi OS, Ubuntu Desktop/Server, Kali Linux ARM, Debian ARM.
 > NOT compatible with Proxmox VE or x86/x86_64 systems.
 > Must be run with `sudo bash <(curl -s URL)` — not curl alone.
 
-> ℹ Scripts 5–6 are run from the **Proxmox VE shell** and use the [Proxmox VE Community Scripts](https://community-scripts.org) to create and configure LXC containers.
+> ℹ Scripts 5–6 are **post-install configuration scripts**. Install the LXC first from [community-scripts.org](https://community-scripts.org), then run the script to configure it.
 
 ---
 
@@ -142,18 +142,18 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 sudo bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pi-setup/pi-setup.sh)
 ```
 
-### Deploy Technitium DNS Server LXC (Proxmox VE)
+### Configure Technitium DNS Server (post-install)
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/dns-server-install.sh)
 ```
 
-### Deploy Nginx Proxy Manager LXC (Proxmox VE)
+### Configure Nginx Proxy Manager (post-install)
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
 ```
 
 > **Note:** The pi-setup one-liner requires `sudo bash <(...)` — not bare curl.
-> Scripts 5–6 must be run from the Proxmox VE shell as root.
+> Scripts 5–6 require the LXC to already be running. Install first from community-scripts.org.
 > All one-liners require the repository to be set to **Public** in GitHub settings.
 
 ---
