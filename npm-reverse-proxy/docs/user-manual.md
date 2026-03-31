@@ -1,7 +1,7 @@
 # Nginx Proxy Manager — User Manual
 
-> Created by: Thomas Van Auken — Van Auken Tech  
-> Version: 1.0.0  
+> Created by: Thomas Van Auken — Van Auken Tech
+> Version: 1.1.0
 > Date: 2026-03-31
 
 ---
@@ -9,67 +9,42 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [Architecture](#2-architecture)
+2. [How This Script Works](#2-how-this-script-works)
 3. [Prerequisites](#3-prerequisites)
-4. [Running the Installer](#4-running-the-installer)
-5. [Initial Web UI Setup](#5-initial-web-ui-setup)
-6. [Adding a Proxy Host](#6-adding-a-proxy-host)
-7. [SSL Certificate Management](#7-ssl-certificate-management)
-8. [Wildcard Certificates](#8-wildcard-certificates)
-9. [Access Lists](#9-access-lists)
-10. [Streams (TCP/UDP Proxying)](#10-streams-tcpudp-proxying)
-11. [Certbot DNS Plugins](#11-certbot-dns-plugins)
-12. [Maintenance and Updates](#12-maintenance-and-updates)
-13. [Troubleshooting](#13-troubleshooting)
+4. [Step 1 — Install the LXC from Community Scripts](#4-step-1--install-the-lxc-from-community-scripts)
+5. [Step 2 — Run the Configuration Script](#5-step-2--run-the-configuration-script)
+6. [Configuration Prompts Explained](#6-configuration-prompts-explained)
+7. [What the Script Configures](#7-what-the-script-configures)
+8. [After the Script — Adding Proxy Hosts](#8-after-the-script--adding-proxy-hosts)
+9. [SSL Certificates](#9-ssl-certificates)
+10. [Maintenance and Updates](#10-maintenance-and-updates)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
 ## 1. Overview
 
-Nginx Proxy Manager (NPM) is a web-based GUI for managing Nginx reverse proxy rules without writing Nginx configuration files manually. It uses **OpenResty** (Nginx + Lua) as its engine and provides:
+This script configures an **Nginx Proxy Manager** LXC container that has already been deployed on Proxmox VE. It connects to the NPM HTTP API and performs all post-install setup automatically:
 
-- **Proxy Hosts** — route domain names to backend services (HTTP/HTTPS)
-- **SSL Certificates** — automated Let's Encrypt issuance and renewal, plus custom cert uploads
-- **Wildcard certificates** — single certificate covering all subdomains (e.g., `*.home.vanauken.tech`)
-- **Access Lists** — IP or password-based access control per proxy host
-- **Redirection Hosts** — HTTP → HTTPS redirects and domain forwarding
-- **Streams** — raw TCP/UDP port proxying
-- **404 Hosts** — catch-all for unmatched domains
+- Creates the admin account
+- Authenticates and acquires an API token
+- Optionally imports a wildcard SSL certificate
 
-This installer deploys NPM as a lightweight Proxmox VE LXC container using the [Proxmox VE Community Scripts](https://community-scripts.org/scripts?id=nginxproxymanager).
+Nginx Proxy Manager (NPM) is a web-based reverse proxy manager backed by OpenResty/Nginx. It provides domain-to-service routing, SSL certificate management, access control, and HTTP/2 — all managed through a browser UI with no manual Nginx config editing.
 
 ---
 
-## 2. Architecture
+## 2. How This Script Works
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Proxmox VE Host                           │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │              Nginx Proxy Manager LXC Container          │    │
-│  │                                                         │    │
-│  │   • OpenResty (Nginx) — HTTP :80 / HTTPS :443           │    │
-│  │   • NPM Web UI — TCP :81                                │    │
-│  │   • Certbot — Let's Encrypt certificate management      │    │
-│  │   • SQLite — proxy host / cert / user database          │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
+The script communicates with NPM exclusively through its HTTP REST API. No SSH into the LXC is required. The script runs from any machine with network access to the LXC IP on port 81.
 
-  External client  ──►  :443 HTTPS  ──►  NPM  ──►  Backend service
-  Internal client  ──►  :443 HTTPS  ──►  NPM  ──►  Backend service
-  Admin browser    ──►  :81  HTTP   ──►  NPM Web UI
-```
+**API endpoints used:**
 
-**Request Flow:**
-
-1. Client sends HTTPS request for `service.home.vanauken.tech:443`
-2. NPM receives the request and matches the hostname to a configured Proxy Host
-3. NPM forwards the request to the backend service (e.g., `192.168.10.5:8080`)
-4. Response is returned to the client with the NPM SSL certificate
-
-The backend service never needs to handle SSL — NPM terminates all TLS connections.
+| Action | Endpoint |
+|--------|----------|
+| Create admin account | `POST /api/users` |
+| Login / get token | `POST /api/tokens` |
+| Import SSL certificate | `POST /api/nginx/certificates` |
 
 ---
 
@@ -77,284 +52,175 @@ The backend service never needs to handle SSL — NPM terminates all TLS connect
 
 | Requirement | Details |
 |-------------|----------|
-| Proxmox VE | Version 8.x or 9.x, running on the host |
-| Root access | Script must run as root in the Proxmox VE shell |
-| Internet | Required during install for community script and container image |
-| LXC storage | At least 8 GB available on your Proxmox storage pool |
-| IP address | A static IP reserved for the NPM LXC (recommended) |
-| DNS | A wildcard or specific DNS record pointing to the NPM LXC IP |
-| Ports 80/443 | Must be reachable by clients (and forwarded from router if external access needed) |
+| Proxmox VE | 8.x or 9.x |
+| NPM LXC | Already deployed and running (see Step 1) |
+| Port 81 | Must be reachable from the machine running this script |
+| Root access | Script must run as root |
+| Internet | Required to auto-install `curl` and `jq` if not present |
+| SSL cert files | Optional — `.crt` and `.key` files if importing a wildcard cert |
 
 ---
 
-## 4. Running the Installer
+## 4. Step 1 — Install the LXC from Community Scripts
 
-### Step 1 — Open the Proxmox VE Shell
+Before running this script, the Nginx Proxy Manager LXC must be deployed.
 
-Log in to your Proxmox VE web UI at `https://<PVE-IP>:8006`. Navigate to your node in the left panel, then click **Shell**.
+1. Log in to your Proxmox VE web UI at `https://<PVE-IP>:8006`
+2. Navigate to your node → click **Shell**
+3. Go to: **https://community-scripts.org/scripts?id=nginxproxymanager**
+4. Copy the install command and run it in the Proxmox shell
+5. Follow the prompts — choose **Default** or **Advanced** (Advanced lets you set a static IP, which is recommended)
+6. Wait for the LXC to be created and started — the build process compiles OpenResty from source and takes several minutes
+7. Note the LXC IP address shown at the end of the community script
 
-### Step 2 — Run the Script
+**Default LXC specs created by the community script:**
 
-Paste and execute the following command in the Proxmox shell:
+| Setting | Value |
+|---------|-------|
+| OS | Debian 12 (Bookworm) |
+| CPU | 2 vCPU |
+| RAM | 2048 MB |
+| Disk | 8 GB |
+| Web UI | http://\<LXC-IP\>:81 |
+
+---
+
+## 5. Step 2 — Run the Configuration Script
+
+Once the LXC is running, execute the following from a root shell with network access to the LXC:
 
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
 ```
 
-### Step 3 — Preflight Phase
-
-The script will:
-- Verify it is running as root
-- Confirm it is on a Proxmox VE host
-- Check internet connectivity
-- Ensure `curl` is available
-
-### Step 4 — Spec Preview
-
-Before launching the community script, the installer displays the default LXC specifications:
-
-| Setting | Default |
-|---------|----------|
-| OS | Debian 12 (Bookworm) |
-| CPU | 2 vCPU |
-| RAM | 2048 MB |
-| Disk | 8 GB |
-| Web UI Port | 81 |
-
-### Step 5 — Community Script Prompt
-
-The community script presents an interactive menu:
-
-- **Default** — accepts all defaults, creates the container immediately
-- **Advanced** — customise CPU, RAM, disk, container ID, storage pool, bridge, hostname, and IP assignment
-
-> **Recommendation:** Use **Advanced** to assign a static IP to the NPM LXC. This is the IP your DNS wildcard record and port forwarding rules must point to.
-
-### Step 6 — Container Creation
-
-The community script will:
-1. Download the Debian 12 LXC template
-2. Create and start the LXC container
-3. Build OpenResty from source inside the container
-4. Install Node.js 22, Yarn, and NPM backend dependencies
-5. Build the NPM frontend
-6. Enable and start the `npm` and `openresty` systemd services
-7. Print the container IP and web UI URL
-
-### Step 7 — Post-Install Summary
-
-After the community script completes, the Van Auken Tech wrapper prints:
-- First-launch setup wizard steps
-- Certbot plugin installation note
-- Web UI access URL
-- Log file location
-- Completion summary block
+The script will walk you through all configuration interactively.
 
 ---
 
-## 5. Initial Web UI Setup
+## 6. Configuration Prompts Explained
 
-### Accessing the Web UI
-
-Open a browser and navigate to:
+When the script starts, it displays the following in the Configuration section:
 
 ```
-http://<NPM-LXC-IP>:81
+── Configuration ───────────────────────────────────────────
+
+  About admin credentials:
+
+  [▸]  Fresh install (web UI setup wizard never opened):
+        Enter the email and password you WANT to create.
+        This script creates the admin account via the API automatically.
+
+  [▸]  Already completed the NPM web UI setup wizard:
+        Enter the email and password you already set up.
+        The script will skip account creation and log in directly.
 ```
 
-### Account Creation Wizard
+### Prompt Details
 
-On first launch, NPM guides you through creating the administrator account:
+**NPM LXC IP address**
+The IP address of the NPM LXC container. Example: `172.16.250.9`
 
-1. Enter your **full name**
-2. Enter your **email address** (used for Let's Encrypt certificate notifications)
-3. Enter a strong **password** and confirm it
-4. Click **Save**
+**Admin full name** (default: `Administrator`)
+Display name for the administrator account shown in the NPM web UI.
 
-There are no default credentials — you create the admin account on first run.
+**Admin email address**
+The email address used as the NPM login username. Example: `admin@home.vanauken.tech`
 
-### Dashboard Overview
+**Admin password**
+Entered twice for confirmation. Input is hidden.
 
-After logging in, the NPM dashboard shows:
+**Path to .crt file** (optional)
+Full file path to a wildcard SSL certificate file. Example: `/root/certs/wildcard.crt`
+Press Enter to skip cert import.
 
-- **Proxy Hosts** — all configured reverse proxy rules
-- **Redirection Hosts** — domain forwarding rules
-- **Streams** — TCP/UDP port proxy rules
-- **404 Hosts** — catch-all error host
-- **SSL Certificates** — all managed certificates
-- **Access Lists** — IP/password access control rules
-- **Users** — NPM user accounts
+**Path to .key file** (optional)
+Full file path to the private key matching the certificate. Example: `/root/certs/wildcard.key`
+Only prompted if a `.crt` path was provided.
+
+**Certificate friendly name** (default: `Wildcard Certificate`)
+The label shown for this certificate in the NPM Certificates list.
 
 ---
 
-## 6. Adding a Proxy Host
+## 7. What the Script Configures
 
-A Proxy Host maps an incoming domain name to a backend service.
+### Admin Account
 
-### Steps
+On a fresh NPM installation, no accounts exist. The NPM web UI shows a setup wizard on first visit. This script bypasses the wizard entirely by calling `POST /api/users` to create the admin account directly via the API.
 
-1. Click **Proxy Hosts** → **Add Proxy Host**
-2. **Details tab:**
-   - **Domain Names** — enter the fully qualified domain name (e.g., `npm.home.vanauken.tech`)
-   - **Scheme** — `http` or `https` (the scheme to the backend, not the client)
-   - **Forward Hostname / IP** — the backend service IP or hostname
-   - **Forward Port** — the backend service port (e.g., `81`, `8080`, `3000`)
-   - **Cache Assets** — enable for static content sites
-   - **Block Common Exploits** — enable for all hosts
-   - **Websockets Support** — enable if the backend uses websockets (e.g., Home Assistant)
-3. **SSL tab:**
-   - Select an existing certificate or request a new Let's Encrypt cert
-   - Enable **Force SSL** — redirects HTTP to HTTPS
-   - Enable **HTTP/2 Support** — improves performance
-   - Enable **HSTS** — optional, enforces HTTPS in browsers
-4. **Access List tab** (optional):
-   - Attach an Access List to restrict who can reach this proxy host
+If the account already exists (you completed the web UI wizard), the creation call returns an error. The script detects this, shows `Account already exists — logging in with provided credentials`, and proceeds normally.
+
+### Authentication Token
+
+After account creation (or if account already exists), the script calls `POST /api/tokens` with the email and password to obtain a Bearer token. This token is used for all subsequent API calls.
+
+### Wildcard SSL Certificate Import
+
+If `.crt` and `.key` file paths were provided, the script uploads them to NPM via `POST /api/nginx/certificates` as a multipart form upload. The certificate is stored in NPM and is immediately available to assign to Proxy Hosts.
+
+If no cert paths were provided, this step is skipped. You can import certificates later through the NPM web UI under **SSL Certificates**.
+
+---
+
+## 8. After the Script — Adding Proxy Hosts
+
+Proxy Hosts route incoming domain names to backend services. Adding them is done through the NPM web UI.
+
+1. Open `http://<LXC-IP>:81` and log in
+2. Click **Hosts → Proxy Hosts → Add Proxy Host**
+3. **Details tab:**
+   - Domain Names: the FQDN (e.g. `npm.home.vanauken.tech`)
+   - Scheme: `http` or `https` (scheme to the backend, not the client)
+   - Forward Hostname/IP: backend service IP or hostname
+   - Forward Port: backend service port
+   - Enable **Block Common Exploits**
+   - Enable **Websockets Support** if needed (e.g. Home Assistant)
+4. **SSL tab:**
+   - Select your imported wildcard certificate (or request a new one)
+   - Enable **Force SSL**
+   - Enable **HTTP/2 Support**
 5. Click **Save**
 
 ---
 
-## 7. SSL Certificate Management
+## 9. SSL Certificates
+
+### Using the Imported Wildcard Certificate
+
+If you imported a wildcard cert during the script, it will appear in **SSL Certificates** in the NPM web UI. When adding a Proxy Host, select it from the certificate dropdown in the SSL tab.
 
 ### Requesting a Let's Encrypt Certificate
 
-1. Navigate to **SSL Certificates** → **Add SSL Certificate** → **Let's Encrypt**
-2. Enter the domain name(s) — use a comma-separated list for multiple SANs
-3. Enter the email address for expiry notifications
-4. Select the challenge type:
-   - **HTTP Challenge** — NPM must be reachable on port 80 from the internet
-   - **DNS Challenge** — requires a DNS provider plugin (see Section 11)
-5. Agree to the Let's Encrypt Terms of Service
-6. Click **Save** — NPM requests the certificate and stores it automatically
+1. **SSL Certificates → Add SSL Certificate → Let's Encrypt**
+2. Enter domain names, email address, and select challenge type
+3. HTTP challenge requires port 80 accessible from the internet
+4. DNS challenge requires a supported DNS provider certbot plugin
 
-### Certificate Auto-Renewal
+### Installing Certbot DNS Plugins
 
-NPM automatically renews Let's Encrypt certificates before they expire. No manual intervention is required. Renewal logs are visible in the NPM web UI under the certificate details.
-
-### Uploading a Custom Certificate
-
-1. Navigate to **SSL Certificates** → **Add SSL Certificate** → **Custom**
-2. Enter a friendly name
-3. Upload your certificate (`.crt` or `.pem`) and private key (`.key`)
-4. If using a certificate chain, upload the intermediate certificate
-5. Click **Save**
-
----
-
-## 8. Wildcard Certificates
-
-A wildcard certificate (e.g., `*.home.vanauken.tech`) covers all subdomains under a parent domain with a single certificate.
-
-### Requirements
-
-- A wildcard certificate **requires the DNS challenge** — it cannot be issued via HTTP challenge
-- You need API access to your DNS provider (e.g., GoDaddy, Cloudflare, Route53) for automated DNS challenge
-- Alternatively, you can complete the DNS challenge manually and upload the resulting certificate as a Custom certificate
-
-### Manual Wildcard via acme.sh (Recommended for GoDaddy)
-
-If the DNS provider does not have a working certbot plugin, use `acme.sh` on a separate machine:
-
-```bash
-# Install acme.sh
-curl https://get.acme.sh | sh
-
-# Request wildcard cert via manual DNS-01
-~/.acme.sh/acme.sh --issue --dns --d '*.home.vanauken.tech' --d 'home.vanauken.tech' \
-  --yes-I-know-dns-manual-mode-enough-go-ahead-please
-```
-
-Follow the instructions to add the TXT records to GoDaddy, then:
-
-```bash
-~/.acme.sh/acme.sh --renew --dns --d '*.home.vanauken.tech' \
-  --yes-I-know-dns-manual-mode-enough-go-ahead-please
-```
-
-Upload the resulting `.crt` and `.key` files to NPM as a Custom certificate.
-
----
-
-## 9. Access Lists
-
-Access Lists allow you to restrict access to a Proxy Host by IP address or HTTP Basic Authentication.
-
-### Creating an Access List
-
-1. Navigate to **Access Lists** → **Add Access List**
-2. Enter a name (e.g., `Internal Only`)
-3. **Authorization tab** — optionally add username/password pairs for Basic Auth
-4. **Access tab**:
-   - **Allow** — add IP ranges that are permitted (e.g., `192.168.0.0/16`, `172.16.0.0/12`)
-   - **Deny** — add IPs that should be blocked
-   - Enable **Satisfy Any** if you want either IP allowlist OR password auth to grant access
-5. Click **Save**
-
-### Applying an Access List
-
-When creating or editing a Proxy Host, select the Access List in the **Access List** tab.
-
----
-
-## 10. Streams (TCP/UDP Proxying)
-
-Streams allow raw TCP or UDP port forwarding without HTTP — useful for non-HTTP services.
-
-### Adding a Stream
-
-1. Navigate to **Streams** → **Add Stream**
-2. Enter the **Incoming Port** (the port NPM listens on)
-3. Enter the **Forward Host** and **Forward Port** (the backend service)
-4. Select **TCP** or **UDP**
-5. Click **Save**
-
----
-
-## 11. Certbot DNS Plugins
-
-For DNS challenge certificate issuance (required for wildcard certs with supported providers), certbot DNS plugins can be installed inside the NPM LXC.
-
-### Installing Common Plugins
-
-Enter the NPM LXC console from Proxmox:
+For DNS challenge automation, run inside the NPM LXC:
 
 ```bash
 pct enter <CTID>
-```
-
-Then run the plugin installer script:
-
-```bash
 /app/scripts/install-certbot-plugins
 ```
 
-This installs plugins for common providers including Cloudflare, Route53, DigitalOcean, Linode, and others.
-
-> **Note:** Not all providers are included. Some plugins require additional system packages that must be installed manually. Consult the specific plugin's documentation for requirements.
-
-### GoDaddy
-
-As of 2026, there is no official certbot-dns-godaddy plugin in wide distribution. Use the manual `acme.sh` method described in Section 8 to obtain wildcard certificates for GoDaddy-managed domains.
+This installs common DNS provider plugins (Cloudflare, Route53, DigitalOcean, etc.).
 
 ---
 
-## 12. Maintenance and Updates
+## 10. Maintenance and Updates
 
-### Updating Nginx Proxy Manager
+### Updating NPM
 
-To update NPM inside the LXC:
-
-1. From the Proxmox VE shell, enter the LXC console:
-   ```bash
-   pct enter <CTID>
-   ```
-2. Run the update command:
-   ```bash
-   update
-   ```
+```bash
+pct enter <CTID>
+update
+```
 
 ### Backing Up
 
-All NPM data is stored in `/data/`. Back up this directory to preserve proxy rules, certificates, access lists, and the database:
+All NPM configuration, certificates, and proxy rules are stored in `/data/` inside the LXC:
 
 ```bash
 tar czf npm-backup-$(date +%Y%m%d).tar.gz /data/
@@ -363,10 +229,10 @@ tar czf npm-backup-$(date +%Y%m%d).tar.gz /data/
 ### Log Files
 
 - NPM logs: `/data/logs/` inside the LXC
-- Nginx/OpenResty access and error logs: `/var/log/nginx/` inside the LXC
-- Install script log: `/var/log/npm-reverse-proxy-install-<timestamp>.log` on the Proxmox host
+- Nginx logs: `/var/log/nginx/` inside the LXC
+- Configuration script log: `/var/log/npm-config-<timestamp>.log` on the host that ran the script
 
-### Checking Service Status
+### Service Status
 
 Inside the LXC:
 
@@ -377,40 +243,40 @@ systemctl status openresty
 
 ---
 
-## 13. Troubleshooting
+## 11. Troubleshooting
 
-### Web UI Not Accessible
+### Script Cannot Reach NPM
 
-- Verify the `npm` service is running: `systemctl status npm` inside the LXC
-- Confirm port 81 is listening: `netstat -tulnp | grep :81`
-- Check that the LXC IP is reachable from the client network
+- Verify the LXC is running: `pct status <CTID>`
+- Confirm port 81 is listening: `pct exec <CTID> -- netstat -tulnp | grep :81`
+- Ensure no firewall blocks port 81 between the script host and LXC
 
-### HTTPS Not Working / Certificate Errors
+### Authentication Failed
 
-- Verify the `openresty` service is running: `systemctl status openresty`
-- Confirm port 443 is listening: `netstat -tulnp | grep :443`
-- Check that the DNS record for the domain points to the NPM LXC IP
-- Review the certificate in the NPM web UI — check expiry and domain coverage
+- If you already set up an account via the web UI wizard, enter exactly those credentials at the prompt
+- Email addresses are case-sensitive in some NPM versions
+- Check `/var/log/npm-config-<timestamp>.log` for the raw API response
 
-### Let's Encrypt Certificate Request Failing
+### Certificate Import Failed
 
-- For HTTP challenge: verify port 80 is open and reachable from the internet
-- For DNS challenge: verify the DNS provider API credentials are correct
-- Check the NPM web UI error message for the specific failure reason
-- Let's Encrypt rate limits apply — do not request the same certificate more than 5 times per week
+- Verify the `.crt` and `.key` files exist at the paths provided
+- Confirm the key matches the certificate: `openssl x509 -noout -modulus -in cert.crt | md5sum` should match `openssl rsa -noout -modulus -in cert.key | md5sum`
+- Check the log file for the raw API error response
 
-### Proxy Host Returning 502 Bad Gateway
+### Proxy Host Returns 502 Bad Gateway
 
-- Verify the backend service is running and listening on the configured port
-- Confirm the NPM LXC can reach the backend IP (check routing and firewall rules)
-- Check the Nginx error log inside the LXC: `tail -f /var/log/nginx/error.log`
+- Confirm the backend service is running and listening
+- Verify the NPM LXC can reach the backend IP (check VLAN routing)
+- Check Nginx error log inside LXC: `tail -f /var/log/nginx/error.log`
 
 ### Services Not Starting After LXC Reboot
 
-- Confirm systemd services are enabled: `systemctl is-enabled npm openresty`
-- If not: `systemctl enable npm openresty && systemctl start npm openresty`
+```bash
+pct exec <CTID> -- systemctl enable npm openresty
+pct exec <CTID> -- systemctl start npm openresty
+```
 
 ---
 
-*Created by: Thomas Van Auken — Van Auken Tech*  
+*Created by: Thomas Van Auken — Van Auken Tech*
 *Repository: https://github.com/tvanauken/install-scripts*

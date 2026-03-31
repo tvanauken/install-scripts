@@ -1,7 +1,7 @@
 # Technitium DNS Server — User Manual
 
-> Created by: Thomas Van Auken — Van Auken Tech  
-> Version: 1.0.0  
+> Created by: Thomas Van Auken — Van Auken Tech
+> Version: 1.1.0
 > Date: 2026-03-31
 
 ---
@@ -9,69 +9,46 @@
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [Architecture](#2-architecture)
+2. [How This Script Works](#2-how-this-script-works)
 3. [Prerequisites](#3-prerequisites)
-4. [Running the Installer](#4-running-the-installer)
-5. [Initial Web UI Configuration](#5-initial-web-ui-configuration)
-6. [Enabling Recursive Resolution](#6-enabling-recursive-resolution)
-7. [Creating Authoritative Zones](#7-creating-authoritative-zones)
-8. [Split-Horizon DNS](#8-split-horizon-dns)
-9. [RFC 2136 Dynamic DNS Updates](#9-rfc-2136-dynamic-dns-updates)
-10. [Blocklists and Filtering](#10-blocklists-and-filtering)
-11. [DNS over HTTPS and TLS](#11-dns-over-https-and-tls)
-12. [Pointing Clients to Technitium DNS](#12-pointing-clients-to-technitium-dns)
-13. [Maintenance and Updates](#13-maintenance-and-updates)
-14. [Troubleshooting](#14-troubleshooting)
+4. [Step 1 — Install the LXC from Community Scripts](#4-step-1--install-the-lxc-from-community-scripts)
+5. [Step 2 — Run the Configuration Script](#5-step-2--run-the-configuration-script)
+6. [Configuration Prompts Explained](#6-configuration-prompts-explained)
+7. [What the Script Configures](#7-what-the-script-configures)
+8. [After the Script — Adding DNS Records](#8-after-the-script--adding-dns-records)
+9. [Pointing DHCP Clients to Technitium](#9-pointing-dhcp-clients-to-technitium)
+10. [Maintenance and Updates](#10-maintenance-and-updates)
+11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
 ## 1. Overview
 
-Technitium DNS Server is a free, open-source, privacy-focused DNS server that runs on Linux, Windows, and macOS. This installer deploys it as a lightweight Proxmox VE LXC container using the official [Proxmox VE Community Scripts](https://community-scripts.org/scripts?id=technitiumdns).
+This script configures a **Technitium DNS Server** LXC container that has already been deployed on Proxmox VE. It connects to the Technitium HTTP API and performs all post-install setup automatically:
 
-Key capabilities relevant to a Van Auken Tech homelab deployment:
+- Creates the admin account
+- Enables recursive DNS resolution
+- Configures upstream forwarders
+- Creates your internal DNS zones
+- Enables RFC 2136 dynamic DNS updates
 
-- **Recursive resolver** — forwards queries to root servers or upstream resolvers (e.g., Cloudflare, Quad9)
-- **Authoritative zones** — hosts internal zones (e.g., `home.vanauken.tech`) with full record control
-- **Split-horizon DNS** — resolves the same domain to different IPs depending on whether the client is internal or external
-- **RFC 2136 dynamic updates** — accepts DNS updates from DHCP servers dynamically
-- **Blocklists** — network-wide ad and malware domain blocking
-- **DoH / DoT** — encrypted upstream resolution
-- **DNSSEC validation** — cryptographic zone integrity verification
-- **Web UI** — full management via browser at port 5380
+Technitium DNS is a free, open-source, privacy-focused DNS server with a web UI. It is ideal as the internal DNS backbone for a split-horizon home network or enterprise homelab.
 
 ---
 
-## 2. Architecture
+## 2. How This Script Works
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        Proxmox VE Host                           │
-│                                                                  │
-│  ┌─────────────────────────────────────────────────────────┐    │
-│  │              Technitium DNS LXC Container               │    │
-│  │                                                         │    │
-│  │   • Listens on UDP/TCP 53 (DNS)                         │    │
-│  │   • Listens on TCP 5380 (Web UI)                        │    │
-│  │   • Authoritative for internal zones                    │    │
-│  │   • Recursive resolver for external queries             │    │
-│  └─────────────────────────────────────────────────────────┘    │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
+The script communicates with Technitium exclusively through its HTTP REST API. No SSH into the LXC is required. The script runs from any machine with network access to the LXC IP on port 5380 — typically the Proxmox VE host shell.
 
-  Internal clients  ──►  LXC:53 (DNS)  ──►  Internal zones (authoritative)
-                                        ──►  Root / Upstream (recursive)
+**API endpoints used:**
 
-  Admin browser     ──►  LXC:5380 (Web UI)
-```
-
-**DNS Query Flow:**
-
-1. Client sends DNS query to Technitium LXC IP
-2. Technitium checks if the query matches a locally authoritative zone
-   - Match → returns the authoritative answer from the local zone
-   - No match → forwards to configured upstream resolver or root servers
-3. Result is cached and returned to the client
+| Action | Endpoint |
+|--------|----------|
+| Create admin account | `POST /api/user/createAccount` |
+| Login / get token | `POST /api/user/login` |
+| Set recursion + forwarders | `POST /api/settings/set` |
+| Create zone | `POST /api/zones/create` |
+| Enable RFC 2136 on zone | `POST /api/zones/options/set` |
 
 ---
 
@@ -79,289 +56,179 @@ Key capabilities relevant to a Van Auken Tech homelab deployment:
 
 | Requirement | Details |
 |-------------|----------|
-| Proxmox VE | Version 8.x or 9.x, running on the host |
-| Root access | Script must run as root in the Proxmox VE shell |
-| Internet | Required during install to pull the community script and container image |
-| LXC storage | At least 2 GB available on your Proxmox storage pool |
-| IP address | A static IP reserved for the DNS LXC (recommended) |
+| Proxmox VE | 8.x or 9.x |
+| Technitium DNS LXC | Already deployed and running (see Step 1) |
+| Port 5380 | Must be reachable from the machine running this script |
+| Root access | Script must run as root |
+| Internet | Required to auto-install `curl` and `jq` if not present |
 
 ---
 
-## 4. Running the Installer
+## 4. Step 1 — Install the LXC from Community Scripts
 
-### Step 1 — Open the Proxmox VE Shell
+Before running this script, the Technitium DNS LXC must be deployed.
 
-Log in to your Proxmox VE web UI at `https://<PVE-IP>:8006`. Navigate to your node in the left panel, then click **Shell**.
+1. Log in to your Proxmox VE web UI at `https://<PVE-IP>:8006`
+2. Navigate to your node → click **Shell**
+3. Go to: **https://community-scripts.org/scripts?id=technitiumdns**
+4. Copy the install command and run it in the Proxmox shell
+5. Follow the prompts — choose **Default** or **Advanced** (Advanced lets you set a static IP, which is recommended)
+6. Wait for the LXC to be created and started
+7. Note the LXC IP address shown at the end of the community script
 
-### Step 2 — Run the Script
+**Default LXC specs created by the community script:**
 
-Paste and execute the following command in the Proxmox shell:
+| Setting | Value |
+|---------|-------|
+| OS | Debian 13 (Trixie) |
+| CPU | 1 vCPU |
+| RAM | 512 MB |
+| Disk | 2 GB |
+| Web UI | http://\<LXC-IP\>:5380 |
+
+---
+
+## 5. Step 2 — Run the Configuration Script
+
+Once the LXC is running, execute the following from a root shell with network access to the LXC:
 
 ```bash
 bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/dns-server-install.sh)
 ```
 
-### Step 3 — Preflight Phase
-
-The script will:
-- Verify it is running as root
-- Confirm it is on a Proxmox VE host
-- Check internet connectivity
-- Ensure `curl` is available
-
-### Step 4 — Spec Preview
-
-Before launching the community script, the installer displays the default LXC specifications:
-
-| Setting | Default |
-|---------|----------|
-| OS | Debian 13 (Trixie) |
-| CPU | 1 vCPU |
-| RAM | 512 MB |
-| Disk | 2 GB |
-| Web UI Port | 5380 |
-
-### Step 5 — Community Script Prompt
-
-The community script launches and presents an interactive menu:
-
-- **Default** — accepts all defaults, creates the container immediately
-- **Advanced** — allows you to customise CPU, RAM, disk size, container ID, storage pool, bridge, hostname, and IP assignment (DHCP or static)
-
-> **Recommendation:** Use **Advanced** mode and assign a static IP for the DNS container so DHCP clients always have a stable DNS target.
-
-### Step 6 — Container Creation
-
-The community script will:
-1. Download the Debian 13 LXC template
-2. Create and start the LXC container
-3. Install .NET runtime and Technitium DNS inside the container
-4. Enable and start the `technitium-dns` systemd service
-5. Print the container IP address and web UI URL
-
-### Step 7 — Post-Install Summary
-
-After the community script completes, the Van Auken Tech wrapper prints:
-- Post-install configuration steps
-- Web UI access URL
-- Log file location
-- Completion summary block
+The script will walk you through all configuration interactively.
 
 ---
 
-## 5. Initial Web UI Configuration
+## 6. Configuration Prompts Explained
 
-### Accessing the Web UI
-
-Open a browser and navigate to:
+When the script starts, it displays the following prompt section:
 
 ```
-http://<Technitium-LXC-IP>:5380
+── Configuration ───────────────────────────────────────────
+
+  About admin credentials:
+
+  [▸]  Fresh install (web UI never opened):
+        Enter the username and password you WANT to create.
+        This script creates the account via the API automatically.
+
+  [▸]  Already completed the web UI setup wizard:
+        Enter the username and password you already set up.
+        The script will skip account creation and log in directly.
 ```
 
-### First Login
+### Prompt Details
 
-On first access, Technitium prompts you to create an administrator account:
+**Technitium LXC IP address**
+The IP address of the Technitium LXC container. This is shown at the end of the community script installation. Example: `172.16.250.8`
 
-1. Enter a **username** (e.g., `admin`)
-2. Enter a strong **password**
-3. Click **Create Account**
+**Admin username** (default: `admin`)
+The username for the Technitium administrator account. If this is a fresh install, the script creates this account. If you already went through the web UI, enter the username you set there.
 
-You will be logged in to the Technitium web dashboard.
+**Admin password**
+Entered twice for confirmation. Input is hidden. Used to create the account (fresh install) or to log in (existing account).
 
-### Dashboard Overview
+**Primary internal zone**
+The main DNS zone Technitium will be authoritative for internally. Example: `home.vanauken.tech`
 
-The dashboard provides:
-- **Query Logs** — real-time DNS query monitoring
-- **Statistics** — query counts, block rates, top domains
-- **Zones** — authoritative zone management
-- **Settings** — server configuration
-- **Blocklists** — domain blocking lists
-- **Apps** — DNS app plugins (DoH, blocklist sources, etc.)
+**Additional zones** (optional)
+Comma-separated list of extra zones to create. Example: `mgmt.home.vanauken.tech,iot.home.vanauken.tech`
+Press Enter to skip.
 
----
+**Upstream forwarders** (default: `1.1.1.1,9.9.9.9`)
+Comma-separated list of upstream DNS resolvers for queries that do not match a local zone. Defaults to Cloudflare and Quad9.
 
-## 6. Enabling Recursive Resolution
-
-For Technitium to resolve external domains (anything not in a local zone), recursion must be configured.
-
-### Steps
-
-1. In the web UI, navigate to **Settings**
-2. Click the **Recursion** tab
-3. Set **Recursion** to **Allow All** (for internal use) or configure allowed networks
-4. Under **Forwarders**, add upstream resolvers if you prefer forwarding over full recursion:
-   - `1.1.1.1` — Cloudflare
-   - `9.9.9.9` — Quad9 (malware blocking)
-   - `8.8.8.8` — Google
-5. To use **full root recursion** (no forwarders), leave Forwarders empty and enable **Use Root Servers**
-6. Click **Save Settings**
-
-> For a split-horizon setup, full root recursion is recommended so external DNS answers are never influenced by a third-party forwarder for your own domain.
+**Enable RFC 2136 dynamic updates** (default: `Y`)
+Enables dynamic DNS updates on all zones. Required if you want a DHCP server or sync script to register hostnames automatically.
 
 ---
 
-## 7. Creating Authoritative Zones
+## 7. What the Script Configures
 
-Authoritative zones allow Technitium to be the definitive source of DNS answers for your internal domain names.
+### Admin Account
 
-### Adding a Zone
+On a fresh Technitium installation, no accounts exist. The script calls `POST /api/user/createAccount` to create the admin account before any other API calls are possible.
 
-1. Navigate to **Zones** in the top menu
-2. Click **Add Zone**
-3. Enter the zone name (e.g., `home.vanauken.tech`)
-4. Select **Primary Zone** as the zone type
-5. Click **Add**
+If the account already exists (you completed the web UI wizard), the creation call returns an error. The script detects this, shows `Account already exists — logging in with provided credentials`, and proceeds normally.
 
-### Adding Records to a Zone
+### Recursion
 
-1. Click the zone name to open it
-2. Click **Add Record**
-3. Select the record type:
-   - **A** — IPv4 address record (hostname → IP)
-   - **AAAA** — IPv6 address record
-   - **CNAME** — canonical name alias (hostname → hostname)
-   - **PTR** — reverse lookup (IP → hostname)
-   - **MX** — mail exchanger
-   - **TXT** — text records (SPF, DKIM, ACME challenges)
-4. Fill in the record name and value
-5. Click **Add Record**
+Sets `recursion=AllowAll` — Technitium will resolve any domain name for any client, not just those in local zones. This is appropriate for an internal-only DNS server.
 
-### Example Records
+### Forwarders
 
-| Name | Type | Value | Purpose |
-|------|------|-------|---------|
-| zeus | A | 172.16.250.8 | DNS server |
-| hermes | A | 172.16.250.9 | Reverse proxy |
-| npm | CNAME | hermes | Alias for NPM UI |
-| *.home | CNAME | hermes | Wildcard to reverse proxy |
+Sets upstream DNS resolvers. When Technitium receives a query for a domain that is not in any local zone (e.g., `google.com`), it forwards the query to these servers. Defaults: `1.1.1.1` (Cloudflare) and `9.9.9.9` (Quad9).
+
+### Zones
+
+Creates Primary zones for your primary zone and any additional zones specified. A Primary zone means Technitium is the authoritative source for that domain internally — it answers queries for hostnames in that zone from its own records.
+
+### RFC 2136 Dynamic Updates
+
+Enables `allowDynamicUpdates=true` on every created zone. This allows external systems (DHCP servers, sync scripts) to push DNS record updates to Technitium automatically without manual intervention.
 
 ---
 
-## 8. Split-Horizon DNS
+## 8. After the Script — Adding DNS Records
 
-Split-horizon DNS returns different answers for the same domain depending on the client's network location:
+The script creates the zones but does not add individual host records. You add those through the Technitium web UI.
 
-- **Internal clients** → resolve `service.home.vanauken.tech` to the private IP of the reverse proxy
-- **External clients** → resolve the same name to the public IP (via GoDaddy/No-IP)
+1. Open `http://<LXC-IP>:5380` and log in
+2. Click **Zones** in the top menu
+3. Click your zone name
+4. Click **Add Record**
+5. Select record type:
+   - **A** — hostname to IPv4 address
+   - **CNAME** — hostname alias to another hostname
+   - **PTR** — reverse lookup (IP to hostname)
+6. Fill in the name and value, click **Add Record**
 
-### How It Works in This Setup
+**Example records:**
 
-1. Technitium is authoritative for `home.vanauken.tech` internally
-2. Records in the local zone point to private IPs (e.g., `172.16.x.x`)
-3. Internal clients query Technitium → get private IP answers
-4. External clients never reach Technitium; they query GoDaddy's public DNS → get CNAME to No-IP DDNS
-
-### Configuration
-
-No special Technitium configuration is required beyond:
-- Creating the internal zone with private IP records
-- Ensuring all internal DHCP clients use Technitium as their DNS server
-- Ensuring the external DNS (GoDaddy) has the correct CNAME records pointing to your dynamic DNS hostname
-
----
-
-## 9. RFC 2136 Dynamic DNS Updates
-
-RFC 2136 allows DHCP servers and other clients to push DNS record updates directly to Technitium without manual intervention.
-
-### Enabling RFC 2136 on a Zone
-
-1. Open the zone in the Zones view
-2. Click **Zone Options** (gear icon)
-3. Enable **Allow Dynamic Updates**
-4. Optionally restrict which IPs may send updates using a TSIG key or IP allowlist
-5. Save
-
-### Use Case
-
-If your DHCP server (e.g., UniFi) supports RFC 2136 dynamic DNS, it will automatically register client hostnames in your Technitium zones when leases are granted. This eliminates the need for manual A record management as devices join the network.
-
-> As of 2026, UniFi does not natively support RFC 2136. A polling script can be used as an alternative — see the Van Auken Tech infrastructure documentation.
+| Name | Type | Value |
+|------|------|-------|
+| zeus | A | 172.16.250.8 |
+| hermes | A | 172.16.250.9 |
+| npm | CNAME | hermes |
+| *.home | CNAME | hermes |
 
 ---
 
-## 10. Blocklists and Filtering
-
-Technitium supports network-wide DNS-based ad and malware blocking via blocklist subscriptions.
-
-### Adding a Blocklist
-
-1. Navigate to **Blocklists** in the top menu
-2. Click **Add Blocklist**
-3. Enter the URL of a blocklist source, for example:
-   - `https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts`
-   - `https://blocklistproject.github.io/Lists/malware.txt`
-4. Set the update interval (e.g., `1 day`)
-5. Click **Save**
-
-### Enabling Blocking
-
-1. Navigate to **Settings → Blocking**
-2. Enable **Blocking**
-3. Select your blocking type (NxDomain, No Data, or Custom IP)
-4. Click **Save Settings**
-
----
-
-## 11. DNS over HTTPS and TLS
-
-For encrypted upstream resolution (recommended for privacy):
-
-1. Navigate to **Settings → Forwarders**
-2. Enable **Use Forwarders**
-3. Add DoH forwarders using the `https://` prefix:
-   - `https://cloudflare-dns.com/dns-query` (Cloudflare)
-   - `https://dns.quad9.net/dns-query` (Quad9)
-4. Click **Save Settings**
-
-For DoT (DNS over TLS):
-- Enter forwarder addresses prefixed with `tls://`:
-  - `tls://1.1.1.1`
-  - `tls://9.9.9.9`
-
----
-
-## 12. Pointing Clients to Technitium DNS
+## 9. Pointing DHCP Clients to Technitium
 
 For internal clients to use Technitium, they must receive the LXC IP as their DNS server via DHCP.
 
-### UniFi Network — VLAN DHCP DNS
+### UniFi Network
 
 1. Log in to the UniFi Network Application
-2. Navigate to **Settings → Networks**
-3. For each VLAN, click **Edit**
-4. Under **DHCP**, set **DNS Server** to **Manual**
-5. Enter the Technitium LXC IP (e.g., `172.16.250.8`)
-6. Save and apply
+2. Go to **Settings → Networks**
+3. Edit each VLAN/network
+4. Under **DHCP**, set DNS Server to **Manual** and enter the Technitium LXC IP
+5. Save and apply
 
-Clients will receive the new DNS server on their next DHCP renewal. To force immediate update, clients can run `ipconfig /renew` (Windows) or `sudo dhclient -r && sudo dhclient` (Linux).
+Clients will use the new DNS server on their next DHCP lease renewal.
 
 ### Other DHCP Servers
 
-Look for the **DNS Server** option (DHCP option 6) in your DHCP server configuration and set it to the Technitium LXC IP.
+Set DHCP option 6 (DNS Server) to the Technitium LXC IP in your DHCP server configuration.
 
 ---
 
-## 13. Maintenance and Updates
+## 10. Maintenance and Updates
 
-### Updating Technitium DNS
+### Updating Technitium
 
-To update Technitium inside the LXC:
+From the Proxmox shell, enter the LXC console and run the built-in update command:
 
-1. In the Proxmox VE shell, enter the LXC console:
-   ```bash
-   pct enter <CTID>
-   ```
-2. Run the update command:
-   ```bash
-   update
-   ```
-   This executes the community script's built-in update mechanism.
+```bash
+pct enter <CTID>
+update
+```
 
 ### Backing Up
 
-Technitium stores all configuration and zone data in `/etc/dns/`. Back up this directory regularly:
+Technitium stores all configuration in `/etc/dns/` inside the LXC. Back up this directory:
 
 ```bash
 tar czf technitium-backup-$(date +%Y%m%d).tar.gz /etc/dns/
@@ -369,39 +236,37 @@ tar czf technitium-backup-$(date +%Y%m%d).tar.gz /etc/dns/
 
 ### Log Files
 
-- Technitium logs: accessible via the web UI under **Logs**
-- Install script log: `/var/log/dns-server-install-<timestamp>.log` on the Proxmox host
+- Technitium query logs: visible in the web UI under **Logs**
+- Configuration script log: `/var/log/dns-server-config-<timestamp>.log` on the host that ran the script
 
 ---
 
-## 14. Troubleshooting
+## 11. Troubleshooting
 
-### DNS Not Resolving
+### Script Cannot Reach Technitium
 
-- Verify the Technitium service is running: `systemctl status technitium-dns` inside the LXC
-- Check that port 53 is not blocked: `netstat -tulnp | grep :53`
-- Confirm clients have the correct DNS IP assigned via DHCP
+- Verify the LXC is running: `pct status <CTID>` on the Proxmox host
+- Confirm port 5380 is listening inside the LXC: `pct exec <CTID> -- netstat -tulnp | grep 5380`
+- Ensure no firewall rule blocks port 5380 between the script host and LXC
 
-### Web UI Not Accessible
+### Authentication Failed
 
-- Verify port 5380 is listening: `netstat -tulnp | grep :5380`
-- Check firewall rules on the Proxmox host and VLAN
-- Ensure the LXC IP is reachable from the client
+- If you already set up an account via the web UI, make sure you entered exactly those credentials at the prompt
+- Passwords are case-sensitive
+- Check `/var/log/dns-server-config-<timestamp>.log` for the raw API response
 
-### Zone Not Resolving Correctly
+### Zone Creation Warning
 
-- Verify the zone exists: **Zones** in the web UI
-- Confirm the record names and values are correct
-- Use `dig @<LXC-IP> <hostname>` from a client to test directly against Technitium
-- Check the **Query Logs** in the web UI to see if queries are being received
+- If a zone already exists (e.g., you ran the script twice), the API returns an error but the script continues — existing zones are not modified
 
-### Recursive Resolution Failing
+### DNS Not Resolving on Clients
 
+- Confirm clients have the LXC IP as their DNS server (check DHCP lease)
+- Test directly: `dig @<LXC-IP> <hostname>`
+- Check Technitium query logs in the web UI
 - Confirm recursion is enabled: **Settings → Recursion**
-- Test external resolution: `dig @<LXC-IP> google.com`
-- Verify the LXC has outbound internet connectivity
 
 ---
 
-*Created by: Thomas Van Auken — Van Auken Tech*  
+*Created by: Thomas Van Auken — Van Auken Tech*
 *Repository: https://github.com/tvanauken/install-scripts*

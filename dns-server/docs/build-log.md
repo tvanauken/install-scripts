@@ -1,120 +1,96 @@
-# Technitium DNS Server Installer — Build Log
+# Technitium DNS Server — Build Log
 
-> Created by: Thomas Van Auken — Van Auken Tech  
-> Script version: 1.0.0  
+> Created by: Thomas Van Auken — Van Auken Tech
+> Script version: 1.1.0
 > Build date: 2026-03-31
 
 ---
 
 ## Summary
 
-This document records every action taken to design, build, test, and document the `dns-server-install.sh` script for the Van Auken Tech Install Scripts Collection.
+This document records every action taken to design, build, correct, and document `dns-server-install.sh` — the Technitium DNS Server post-install configuration script for the Van Auken Tech Install Scripts Collection.
 
 ---
 
-## Phase 1 — Research and Requirements
+## Phase 1 — Research
 
-**Actions:**
+- Read `tvanauken/install-scripts` repository: `README.md`, `docs/collection-overview.md`, `cli-tools/cli-tools-install.sh` to establish exact Van Auken Tech visual and code standard.
+- Confirmed community-scripts.org Technitium DNS installer URL and default LXC specs: Debian 13, 1 vCPU, 512 MB RAM, 2 GB disk, port 5380.
+- Confirmed Technitium HTTP API endpoints for account creation, authentication, settings, zone creation, and RFC 2136 configuration.
+- User clarified: script must be post-install configuration only — does NOT create the LXC.
 
-- Reviewed the Van Auken Tech install-scripts repository structure, existing scripts (`cli-tools-install.sh`, `drive_init.sh`, `generate_drive_inventory.sh`, `pi-setup.sh`), and the collection-overview standard.
-- Studied the visual standard: figlet-style ASCII banner, colour palette (`RD`, `YW`, `GN`, `DGN`, `BL`, `CL`, `BLD`), section dividers, status symbols, summary block, and footer.
-- Researched the Proxmox VE Community Scripts project (community-scripts.org) to identify the official Technitium DNS one-liner.
-- Confirmed the Technitium DNS community script URL: `https://raw.githubusercontent.com/community-scripts/ProxmoxVE/main/ct/technitiumdns.sh`
-- Confirmed default LXC specifications: Debian 13, 1 vCPU, 512 MB RAM, 2 GB storage, web UI port 5380.
-- Reviewed Technitium DNS documentation for post-install configuration reference.
-
-**Decisions made:**
-
-- Script is a Van Auken Tech branded wrapper around the community script — it does not replicate the community script logic.
-- The wrapper adds: preflight checks, LXC spec preview, community script invocation, post-install guidance, and completion summary.
-- Script must be run from the Proxmox VE shell (not inside an LXC).
-- Preflight checks must validate: root access AND pveversion (confirms PVE host, not just any Linux box).
+**Decision:** Script connects to the Technitium API on an already-running LXC and configures it entirely via HTTP API calls. No SSH into the LXC required.
 
 ---
 
-## Phase 2 — Script Development
+## Phase 2 — Initial Build (Incorrect — Discarded)
 
-**Actions:**
-
-- Created `/dns-server/dns-server-install.sh` following the Van Auken Tech standard exactly:
-  - Shebang: `#!/usr/bin/env bash`
-  - Header comment block with author, version, date, repo, and source URL
-  - Colour palette variables matching the collection standard
-  - `LOGFILE` written to `/var/log/dns-server-install-<timestamp>.log`
-  - `cleanup()` trap on EXIT resetting terminal cursor and reporting abnormal exits
-  - Helper functions: `msg_info`, `msg_ok`, `msg_error`, `msg_warn`, `section`
-  - `header_info()` — ASCII banner + host/date/log metadata
-  - `preflight()` — root check, PVE host check, internet check, curl availability check
-  - `show_specs()` — displays default LXC specs before community script launches
-  - `run_installer()` — invokes the community script via `bash -c "$(curl -fsSL ...)"` and checks exit code
-  - `post_install_notes()` — six actionable first-run steps with cyan [▸] indicators
-  - `summary()` — `════` completion block matching collection standard, with footer crediting Van Auken Tech
-  - `main()` — orchestrates all functions in sequence
-
-- Verified script is syntactically valid bash.
-- Confirmed `set -o pipefail` is not used at the top level to prevent community script interaction issues; error handling is done at function level.
+- First version incorrectly wrapped the community script one-liner, calling `bash -c "$(curl -fsSL ...)"` to create the LXC.
+- Discarded in full after user correction.
 
 ---
 
-## Phase 3 — Documentation
+## Phase 3 — Correct Build
 
-**Actions:**
+**Script structure implemented:**
 
-- Created `dns-server/README.md` — short overview matching the collection standard:
-  - Credit line, version, test environment
-  - Overview paragraph explaining Technitium DNS
-  - One-liner run command
-  - Numbered what-it-does list
-  - Default LXC specifications table
-  - Post-install first steps
-  - Footer credit
+- `header_info()` — VANAUKEN TECH ASCII banner, host/date/log metadata
+- `preflight()` — root check, auto-installs `curl` and `jq` via apt-get
+- `collect_config()` — interactive prompts with clear explanation of fresh install vs already-configured scenarios
+- `wait_for_service()` — polls `http://<IP>:5380/api/user/login` up to 30 times (2s intervals)
+- `create_account()` — `POST /api/user/createAccount`; gracefully handles already-exists
+- `get_token()` — `POST /api/user/login`; exits with clear error if authentication fails
+- `configure_recursion()` — `POST /api/settings/set` with `recursion=AllowAll` and `forwarders=<value>`
+- `create_zones()` — loops ALL_ZONES array, calls `POST /api/zones/create` for each
+- `enable_rfc2136()` — loops ALL_ZONES array, calls `POST /api/zones/options/set` with `allowDynamicUpdates=true`
+- `summary()` — completion block listing all configured values
+- `main()` — orchestrates all functions in sequence
 
-- Created `dns-server/docs/user-manual.md` — comprehensive user manual covering:
-  - 14-section table of contents
-  - Architecture diagram (ASCII)
-  - DNS query flow explanation
-  - Prerequisites table
-  - Step-by-step installer walkthrough (7 steps)
-  - Initial web UI configuration
-  - Recursive resolution setup with forwarder options
-  - Authoritative zone creation and record management
-  - Split-horizon DNS explanation and configuration
-  - RFC 2136 dynamic DNS update setup
-  - Blocklists and filtering
-  - DNS over HTTPS and TLS
-  - Pointing DHCP clients to Technitium (UniFi and generic)
-  - Maintenance: updates, backups, log locations
-  - Troubleshooting: DNS resolution, web UI, zone issues, recursion failures
-
-- Created `dns-server/docs/build-log.md` (this document).
-
-- Updated `docs/collection-overview.md` — added script 5 to the scripts table and quick reference section.
-
-- Updated root `README.md` — added script 5 entry with overview and one-liner.
+**Van Auken Tech standard compliance verified:**
+- `#!/usr/bin/env bash` shebang
+- `set -o pipefail`
+- `trap cleanup EXIT`
+- Root check
+- Colour palette: `RD` `YW` `GN` `DGN` `BL` `CL` `BLD`
+- Section dividers, status symbols, completion block, footer
+- Attribution in footer and script header comment
+- Timestamped log file at `/var/log/dns-server-config-<timestamp>.log`
 
 ---
 
-## Phase 4 — Repository Integration
+## Phase 4 — Account Handling Clarification
 
-**Actions:**
+**Issue:** Prompts were ambiguous — user did not know whether to enter new credentials (fresh install) or existing credentials (already used web UI wizard).
 
-- All files pushed to `tvanauken/install-scripts` main branch in a single commit.
-- Commit message follows Van Auken Tech convention with Co-Authored-By attribution.
-
----
-
-## File Manifest
-
-| File | Purpose |
-|------|---------|
-| `dns-server/dns-server-install.sh` | Main installer script |
-| `dns-server/README.md` | Short overview |
-| `dns-server/docs/user-manual.md` | Comprehensive user guide |
-| `dns-server/docs/build-log.md` | This build log |
-| `docs/collection-overview.md` | Updated — script 5 added |
-| `README.md` | Updated — script 5 added |
+**Fix:** Added explicit explanation block in `collect_config()`:
+- Green `[▸]` block explains fresh install scenario
+- Yellow `[▸]` block explains already-configured scenario
+- `create_account()` failure message changed from `msg_warn` to `msg_ok "Account already exists — logging in with provided credentials"`
+- `get_token()` failure message explicitly tells user to check if they entered their existing web UI credentials
 
 ---
 
-*Created by: Thomas Van Auken — Van Auken Tech*  
+## Phase 5 — Documentation
+
+- `dns-server/README.md` — updated with Step 1 (install LXC from community-scripts.org) / Step 2 (run this script) usage pattern
+- `dns-server/docs/user-manual.md` — comprehensive guide covering all prompts, what each API call does, post-script record management, DHCP client setup, maintenance, and troubleshooting
+- `dns-server/docs/build-log.md` — this document
+- `docs/collection-overview.md` — table and quick reference updated to reflect post-install nature
+- `README.md` (root) — script 5 entry updated with correct description and Step 1/Step 2 callout
+- Local build log created at `~/Documents/Markdown Documents/dns-npm-postinstall-scripts-build-log.md`
+
+---
+
+## Commit History
+
+| Commit SHA | Description |
+|------------|-------------|
+| `4808a57` | Initial (incorrect) LXC wrapper |
+| `ce3ef80` | Rewritten as post-install config script |
+| `30cf1fc` | Account prompt clarification |
+| `98f29cd` | Collection docs corrected |
+
+---
+
+*Created by: Thomas Van Auken — Van Auken Tech*
 *Repository: https://github.com/tvanauken/install-scripts*
