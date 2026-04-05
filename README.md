@@ -62,33 +62,57 @@ sudo bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/
 
 ---
 
-### 5. Technitium DNS Server — Post-Install Configuration
+### 5. Technitium DNS Server — Full Installation
 **Directory:** [`dns-server/`](dns-server/)
-**Script:** [`dns-server-install.sh`](dns-server/dns-server-install.sh)
+**Script:** [`technitium-dns-install.sh`](dns-server/technitium-dns-install.sh)
 
-> **Step 1:** Install the LXC from [community-scripts.org/scripts?id=technitiumdns](https://community-scripts.org/scripts?id=technitiumdns)
-> **Step 2:** Run this script to configure it.
+> **Full installer** — installs Technitium DNS Server from scratch on any Debian-based LXC/VM.
+> Configures split-horizon DNS with VLAN zones for UniFi network integration.
 
-Configures a running **Technitium DNS Server** LXC via the API: creates the admin account, enables recursion, sets upstream forwarders, creates internal zones, and enables RFC 2136 dynamic updates.
+**Features:**
+- Installs Technitium DNS Server from official source
+- Creates admin account and authenticates via API
+- Configures recursion and upstream forwarders
+- Creates primary zone + VLAN sub-zones + backend zones (for SSL proxy)
+- Creates reverse DNS zones
+- Enables RFC 2136 dynamic updates
+- Configures firewall rules
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/dns-server-install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/technitium-dns-install.sh)
 ```
+
+*Post-install configuration script also available:* [`dns-server-install.sh`](dns-server/dns-server-install.sh)
 
 ---
 
-### 6. Nginx Proxy Manager — Post-Install Configuration
+### 6. Nginx Proxy Manager — Full Installation & Dynamic SSL Proxy
 **Directory:** [`npm-reverse-proxy/`](npm-reverse-proxy/)
-**Script:** [`npm-reverse-proxy-install.sh`](npm-reverse-proxy/npm-reverse-proxy-install.sh)
+**Script:** [`nginx-proxy-manager-install.sh`](npm-reverse-proxy/nginx-proxy-manager-install.sh)
 
-> **Step 1:** Install the LXC from [community-scripts.org/scripts?id=nginxproxymanager](https://community-scripts.org/scripts?id=nginxproxymanager)
-> **Step 2:** Run this script to configure it.
+> **Full installer** — installs Nginx Proxy Manager from scratch with dynamic SSL proxy.
+> Provides valid HTTPS for any internal server via a single wildcard certificate.
 
-Configures a running **Nginx Proxy Manager** LXC via the API: creates the admin account, authenticates, and imports a wildcard SSL certificate.
+**Features:**
+- Installs Docker and NPM container (or native installation)
+- Creates admin account and authenticates via API
+- Requests wildcard Let's Encrypt certificate (DNS challenge via Cloudflare)
+- Configures dynamic SSL proxy with Lua SRV resolver
+- Automatically routes HTTPS requests to backend servers via SRV records
+- Configures firewall rules
+
+**How the Dynamic SSL Proxy Works:**
+1. Browser requests `https://server.vlan.domain.tld`
+2. DNS returns the proxy server's IP
+3. Wildcard certificate validates the connection
+4. Lua script queries SRV record for backend target + port
+5. Request is proxied to the real server with valid SSL
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/nginx-proxy-manager-install.sh)
 ```
+
+*Post-install configuration script also available:* [`npm-reverse-proxy-install.sh`](npm-reverse-proxy/npm-reverse-proxy-install.sh)
 
 ---
 

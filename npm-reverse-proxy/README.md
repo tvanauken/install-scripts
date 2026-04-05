@@ -1,46 +1,81 @@
-# Nginx Proxy Manager — Post-Install Configuration
+# Nginx Proxy Manager — Installation Scripts
 
 > Created by: Thomas Van Auken — Van Auken Tech  
-> Version: 1.0.0  
-> Tested on: Proxmox VE 8.x / 9.x · Debian 12 (Bookworm)
+> Version: 2.0.0  
+> Tested on: Ubuntu 22.04+, Debian 12+, Proxmox VE 8.x/9.x
 
-## Overview
+---
 
-Configures an **Nginx Proxy Manager** LXC that has already been deployed. This script handles everything after the container is running: admin account creation, authentication, and wildcard SSL certificate import — all via the NPM HTTP API.
+## Scripts Available
 
-## How to Use
+### 1. Full Installation Script (Recommended)
+**Script:** [`nginx-proxy-manager-install.sh`](nginx-proxy-manager-install.sh)
 
-**Step 1 — Deploy the Nginx Proxy Manager LXC**
-
-From your Proxmox VE shell, follow the community-scripts installer:
-
-```
-https://community-scripts.org/scripts?id=nginxproxymanager
-```
-
-**Step 2 — Run this script to configure it**
+Installs NPM from scratch with dynamic SSL proxy configuration.
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/nginx-proxy-manager-install.sh)
 ```
 
-## What It Configures
+**Features:**
+- Installs Docker and NPM container
+- Creates admin account via API
+- Requests wildcard Let's Encrypt certificate (Cloudflare DNS challenge)
+- Configures dynamic SSL proxy with Lua SRV resolver
+- Routes HTTPS requests to backends via SRV records
+- Configures firewall (UFW/firewalld)
 
-- Creates the admin account via the NPM API
-- Authenticates and acquires an API token
-- Imports a wildcard SSL certificate (optional — provide `.crt` and `.key` file paths)
+### 2. Post-Install Configuration Script
+**Script:** [`npm-reverse-proxy-install.sh`](npm-reverse-proxy-install.sh)
 
-## Inputs Prompted
+For use when NPM is already installed (e.g., via community-scripts.org).
 
-| Prompt | Default | Description |
-|--------|---------|-------------|
-| LXC IP | — | IP address of the NPM LXC |
-| Admin full name | `Administrator` | Display name for the admin account |
-| Admin email | — | Email address for login |
-| Admin password | — | Password (confirmed, hidden input) |
-| Path to .crt | — | Wildcard cert file path (optional) |
-| Path to .key | — | Private key file path (optional) |
-| Cert name | `Wildcard Certificate` | Friendly label for the cert in NPM |
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
+```
+
+---
+
+## How the Dynamic SSL Proxy Works
+
+1. Browser requests `https://server.vlan.home.vanauken.tech`
+2. DNS returns the proxy server's IP (not the real server)
+3. Wildcard certificate validates the connection
+4. Lua script queries SRV record for backend target + port
+5. Request is proxied to the real server with valid SSL
+
+**Result:** Any internal server gets valid HTTPS without individual certificates.
+
+---
+
+## Required DNS Records (per server)
+
+| Record Type | Name | Value |
+|-------------|------|-------|
+| A Record | `server.vlan.domain.tld` | Proxy IP (e.g., `172.16.250.9`) |
+| Backend A | `server.backend.vlan.domain.tld` | Real server IP |
+| SRV Record | `_https._tcp.server.vlan.domain.tld` | `0 0 PORT backend-target` |
+
+---
+
+## Configuration Prompts
+
+| Setting | Description | Example |
+|---------|-------------|--------|
+| Server IP | This server's IP | `172.16.250.9` |
+| Install method | Docker or native | Docker |
+| Admin email | NPM login email | `admin@domain.com` |
+| Admin password | Min 8 characters | (secure) |
+| Wildcard domain | For SSL cert | `home.vanauken.tech` |
+| DNS provider | For DNS challenge | Cloudflare |
+| CF API token | Zone:DNS:Edit | (token) |
+| Internal DNS | For SRV lookups | `172.16.250.8` |
+
+---
+
+## Integration
+
+Use with the [Technitium DNS installer](../dns-server/) for complete split-horizon DNS + SSL proxy.
 
 ---
 *Van Auken Tech · Thomas Van Auken*
