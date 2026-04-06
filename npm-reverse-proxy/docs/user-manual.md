@@ -1,280 +1,433 @@
 # Nginx Proxy Manager — User Manual
 
-> Created by: Thomas Van Auken — Van Auken Tech
-> Version: 1.1.0
-> Date: 2026-03-31
+> **Created by:** Thomas Van Auken — Van Auken Tech
+> **Version:** 3.0.0
+> **Date:** 2026-04-05
+> **Repository:** https://github.com/tvanauken/install-scripts
+
+---
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|------|
+| 3.0.0 | 2026-04-05 | Native install (no Docker), Lua SRV resolver, dynamic backend routing |
+| 2.0.0 | 2026-04-05 | Wildcard SSL, SRV-based routing |
+| 1.1.0 | 2026-03-31 | Initial release (deprecated) |
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#1-overview)
-2. [How This Script Works](#2-how-this-script-works)
+2. [Features](#2-features)
 3. [Prerequisites](#3-prerequisites)
-4. [Step 1 — Install the LXC from Community Scripts](#4-step-1--install-the-lxc-from-community-scripts)
-5. [Step 2 — Run the Configuration Script](#5-step-2--run-the-configuration-script)
-6. [Configuration Prompts Explained](#6-configuration-prompts-explained)
-7. [What the Script Configures](#7-what-the-script-configures)
-8. [After the Script — Adding Proxy Hosts](#8-after-the-script--adding-proxy-hosts)
-9. [SSL Certificates](#9-ssl-certificates)
-10. [Maintenance and Updates](#10-maintenance-and-updates)
+4. [Installation](#4-installation)
+5. [Configuration Prompts](#5-configuration-prompts)
+6. [What Gets Installed](#6-what-gets-installed)
+7. [How Dynamic Proxy Works](#7-how-dynamic-proxy-works)
+8. [DNS Record Setup](#8-dns-record-setup)
+9. [Web Interface](#9-web-interface)
+10. [Maintenance](#10-maintenance)
 11. [Troubleshooting](#11-troubleshooting)
 
 ---
 
 ## 1. Overview
 
-This script configures an **Nginx Proxy Manager** LXC container that has already been deployed on Proxmox VE. It connects to the NPM HTTP API and performs all post-install setup automatically:
+This script installs Nginx Proxy Manager **natively** (no Docker) with a Lua-based dynamic proxy system. Once configured, any service can be accessed via HTTPS with valid SSL certificates simply by creating DNS records — no manual NPM configuration required.
 
-- Creates the admin account
-- Authenticates and acquires an API token
-- Optionally imports a wildcard SSL certificate
-
-Nginx Proxy Manager (NPM) is a web-based reverse proxy manager backed by OpenResty/Nginx. It provides domain-to-service routing, SSL certificate management, access control, and HTTP/2 — all managed through a browser UI with no manual Nginx config editing.
+**Key Design Principle:** This is a **native installation** using OpenResty. No Docker containers are used. The system uses a Lua script to resolve SRV records and dynamically route requests to backend services.
 
 ---
 
-## 2. How This Script Works
+## 2. Features
 
-The script communicates with NPM exclusively through its HTTP REST API. No SSH into the LXC is required. The script runs from any machine with network access to the LXC IP on port 81.
+### Native Installation
+- OpenResty (nginx + Lua)
+- Node.js + NPM from source
+- No Docker dependency
 
-**API endpoints used:**
+### Dynamic SSL Proxy
+- Wildcard Let's Encrypt certificate
+- Automatic renewal via certbot
+- Cloudflare DNS challenge for validation
 
-| Action | Endpoint |
-|--------|----------|
-| Create admin account | `POST /api/users` |
-| Login / get token | `POST /api/tokens` |
-| Import SSL certificate | `POST /api/nginx/certificates` |
+### Lua SRV Resolver
+- Queries DNS for SRV records
+- Extracts backend target and port
+- Auto-protocol detection (HTTP/HTTPS)
+- No manual proxy host configuration needed
+
+### Zero-Config Service Discovery
+- Add DNS records only
+- Proxy routes automatically
+- Works with any internal service
 
 ---
 
 ## 3. Prerequisites
 
-| Requirement | Details |
-|-------------|----------|
-| Proxmox VE | 8.x or 9.x |
-| NPM LXC | Already deployed and running (see Step 1) |
-| Port 81 | Must be reachable from the machine running this script |
-| Root access | Script must run as root |
-| Internet | Required to auto-install `curl` and `jq` if not present |
-| SSL cert files | Optional — `.crt` and `.key` files if importing a wildcard cert |
+### Hardware Requirements
+- CPU: 2 vCPU minimum
+- RAM: 2 GB minimum
+- Disk: 8 GB minimum
+
+### Software Requirements
+- Debian 12+ or Ubuntu 22.04+
+- Root/sudo access
+- Network connectivity
+
+### External Requirements
+- Cloudflare account with domain
+- Cloudflare API Token (Zone:DNS:Edit)
+- Internal DNS server (for SRV lookups)
+
+### Network Requirements
+- Static IP address for this server
+- Firewall rules allowing:
+  - TCP 80 (HTTP)
+  - TCP 443 (HTTPS)
+  - TCP 81 (NPM Web UI)
 
 ---
 
-## 4. Step 1 — Install the LXC from Community Scripts
+## 4. Installation
 
-Before running this script, the Nginx Proxy Manager LXC must be deployed.
-
-1. Log in to your Proxmox VE web UI at `https://<PVE-IP>:8006`
-2. Navigate to your node → click **Shell**
-3. Go to: **https://community-scripts.org/scripts?id=nginxproxymanager**
-4. Copy the install command and run it in the Proxmox shell
-5. Follow the prompts — choose **Default** or **Advanced** (Advanced lets you set a static IP, which is recommended)
-6. Wait for the LXC to be created and started — the build process compiles OpenResty from source and takes several minutes
-7. Note the LXC IP address shown at the end of the community script
-
-**Default LXC specs created by the community script:**
-
-| Setting | Value |
-|---------|-------|
-| OS | Debian 12 (Bookworm) |
-| CPU | 2 vCPU |
-| RAM | 2048 MB |
-| Disk | 8 GB |
-| Web UI | http://\<LXC-IP\>:81 |
-
----
-
-## 5. Step 2 — Run the Configuration Script
-
-Once the LXC is running, execute the following from a root shell with network access to the LXC:
+### One-Liner Installation
 
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/nginx-proxy-manager-install.sh)
 ```
 
-The script will walk you through all configuration interactively.
-
----
-
-## 6. Configuration Prompts Explained
-
-When the script starts, it displays the following in the Configuration section:
-
-```
-── Configuration ───────────────────────────────────────────
-
-  About admin credentials:
-
-  [▸]  Fresh install (web UI setup wizard never opened):
-        Enter the email and password you WANT to create.
-        This script creates the admin account via the API automatically.
-
-  [▸]  Already completed the NPM web UI setup wizard:
-        Enter the email and password you already set up.
-        The script will skip account creation and log in directly.
-```
-
-### Prompt Details
-
-**NPM LXC IP address**
-The IP address of the NPM LXC container. Example: `172.16.250.9`
-
-**Admin full name** (default: `Administrator`)
-Display name for the administrator account shown in the NPM web UI.
-
-**Admin email address**
-The email address used as the NPM login username. Example: `admin@home.vanauken.tech`
-
-**Admin password**
-Entered twice for confirmation. Input is hidden.
-
-**Path to .crt file** (optional)
-Full file path to a wildcard SSL certificate file. Example: `/root/certs/wildcard.crt`
-Press Enter to skip cert import.
-
-**Path to .key file** (optional)
-Full file path to the private key matching the certificate. Example: `/root/certs/wildcard.key`
-Only prompted if a `.crt` path was provided.
-
-**Certificate friendly name** (default: `Wildcard Certificate`)
-The label shown for this certificate in the NPM Certificates list.
-
----
-
-## 7. What the Script Configures
-
-### Admin Account
-
-On a fresh NPM installation, no accounts exist. The NPM web UI shows a setup wizard on first visit. This script bypasses the wizard entirely by calling `POST /api/users` to create the admin account directly via the API.
-
-If the account already exists (you completed the web UI wizard), the creation call returns an error. The script detects this, shows `Account already exists — logging in with provided credentials`, and proceeds normally.
-
-### Authentication Token
-
-After account creation (or if account already exists), the script calls `POST /api/tokens` with the email and password to obtain a Bearer token. This token is used for all subsequent API calls.
-
-### Wildcard SSL Certificate Import
-
-If `.crt` and `.key` file paths were provided, the script uploads them to NPM via `POST /api/nginx/certificates` as a multipart form upload. The certificate is stored in NPM and is immediately available to assign to Proxy Hosts.
-
-If no cert paths were provided, this step is skipped. You can import certificates later through the NPM web UI under **SSL Certificates**.
-
----
-
-## 8. After the Script — Adding Proxy Hosts
-
-Proxy Hosts route incoming domain names to backend services. Adding them is done through the NPM web UI.
-
-1. Open `http://<LXC-IP>:81` and log in
-2. Click **Hosts → Proxy Hosts → Add Proxy Host**
-3. **Details tab:**
-   - Domain Names: the FQDN (e.g. `npm.home.vanauken.tech`)
-   - Scheme: `http` or `https` (scheme to the backend, not the client)
-   - Forward Hostname/IP: backend service IP or hostname
-   - Forward Port: backend service port
-   - Enable **Block Common Exploits**
-   - Enable **Websockets Support** if needed (e.g. Home Assistant)
-4. **SSL tab:**
-   - Select your imported wildcard certificate (or request a new one)
-   - Enable **Force SSL**
-   - Enable **HTTP/2 Support**
-5. Click **Save**
-
----
-
-## 9. SSL Certificates
-
-### Using the Imported Wildcard Certificate
-
-If you imported a wildcard cert during the script, it will appear in **SSL Certificates** in the NPM web UI. When adding a Proxy Host, select it from the certificate dropdown in the SSL tab.
-
-### Requesting a Let's Encrypt Certificate
-
-1. **SSL Certificates → Add SSL Certificate → Let's Encrypt**
-2. Enter domain names, email address, and select challenge type
-3. HTTP challenge requires port 80 accessible from the internet
-4. DNS challenge requires a supported DNS provider certbot plugin
-
-### Installing Certbot DNS Plugins
-
-For DNS challenge automation, run inside the NPM LXC:
+### Manual Download
 
 ```bash
-pct enter <CTID>
-/app/scripts/install-certbot-plugins
+curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/nginx-proxy-manager-install.sh -o npm-install.sh
+chmod +x npm-install.sh
+sudo ./npm-install.sh
 ```
-
-This installs common DNS provider plugins (Cloudflare, Route53, DigitalOcean, etc.).
 
 ---
 
-## 10. Maintenance and Updates
+## 5. Configuration Prompts
 
-### Updating NPM
+The installer prompts for the following information:
 
-```bash
-pct enter <CTID>
-update
+| Prompt | Description | Example |
+|--------|-------------|------|
+| NPM Server IP | Static IP of this server | `172.16.250.9` |
+| Admin email | NPM login and cert contact | `admin@example.com` |
+| Admin password | Minimum 8 characters | (secure password) |
+| Wildcard domain | Without the `*` | `home.example.com` |
+| DNS Server IP | Your internal DNS | `172.16.250.8` |
+| Cloudflare API Token | For DNS challenge | (from Cloudflare) |
+
+---
+
+## 6. What Gets Installed
+
+### Software
+- OpenResty (nginx with Lua support)
+- Node.js 18.x LTS
+- Nginx Proxy Manager
+- Certbot with Cloudflare plugin
+- Python 3
+
+### Files Created
+
+| Path | Purpose |
+|------|------|
+| `/usr/local/openresty/` | OpenResty installation |
+| `/data/nginx/custom/srv_resolver.lua` | Lua SRV resolver module |
+| `/data/nginx/custom/http.conf` | Custom nginx config |
+| `/etc/ssl/<domain>/fullchain.pem` | Wildcard certificate |
+| `/etc/ssl/<domain>/privkey.pem` | Private key |
+| `/data/logs/dynamic_proxy_*.log` | Proxy logs |
+| `/etc/letsencrypt/` | Certbot configuration |
+
+### Services
+- `openresty` — Web server
+- `npm` — NPM backend
+
+### Cron Jobs
+```
+0 0,12 * * * certbot renew --quiet
 ```
 
-### Backing Up
+---
 
-All NPM configuration, certificates, and proxy rules are stored in `/data/` inside the LXC:
+## 7. How Dynamic Proxy Works
 
-```bash
-tar czf npm-backup-$(date +%Y%m%d).tar.gz /data/
+### Request Flow
+
+```
+Browser → DNS → Hermes IP → Lua Resolver → Backend Service
 ```
 
-### Log Files
+1. **Browser** requests `https://service.vlan.domain.com`
+2. **DNS** returns Hermes (proxy) IP address
+3. **Browser** connects to Hermes with HTTPS
+4. **Wildcard certificate** validates the connection
+5. **Lua script** extracts hostname from request
+6. **Lua script** queries SRV record: `_https._tcp.service.vlan.domain.com`
+7. **SRV record** returns backend target + port
+8. **Lua script** queries A record for backend IP
+9. **Request** proxied to actual backend
 
-- NPM logs: `/data/logs/` inside the LXC
-- Nginx logs: `/var/log/nginx/` inside the LXC
-- Configuration script log: `/var/log/npm-config-<timestamp>.log` on the host that ran the script
+### Protocol Detection
 
-### Service Status
+The Lua resolver checks if the port is in the HTTP ports list:
+- Ports 80, 8080, 8000, 3000 → HTTP
+- All other ports → HTTPS
 
-Inside the LXC:
+This can be customized in `/data/nginx/custom/srv_resolver.lua`.
+
+### Fallback Behavior
+
+If no SRV record exists, the request returns 502 Bad Gateway.
+
+---
+
+## 8. DNS Record Setup
+
+### Records Required Per Service
+
+| Record Type | Name | Value |
+|-------------|------|------|
+| A | `service.vlan.domain` | Hermes IP |
+| A | `service.backend.vlan.domain` | Actual server IP |
+| SRV | `_https._tcp.service.vlan.domain` | `0 0 PORT service.backend.vlan.domain` |
+
+### Example: Proxmox Web UI
+
+Proxmox runs on port 8006 at `172.16.250.10`.
+
+**DNS Records:**
+```
+proxmox.mgmt.home.example.com           A     172.16.250.9
+proxmox.backend.mgmt.home.example.com   A     172.16.250.10
+_https._tcp.proxmox.mgmt.home.example.com SRV 0 0 8006 proxmox.backend.mgmt.home.example.com
+```
+
+**Result:** `https://proxmox.mgmt.home.example.com` works with valid SSL.
+
+### Example: HTTP Service (Grafana on port 3000)
+
+**DNS Records:**
+```
+grafana.mgmt.home.example.com           A     172.16.250.9
+grafana.backend.mgmt.home.example.com   A     172.16.250.20
+_https._tcp.grafana.mgmt.home.example.com SRV 0 0 3000 grafana.backend.mgmt.home.example.com
+```
+
+Port 3000 is in the HTTP ports list, so backend connection uses HTTP.
+
+---
+
+## 9. Web Interface
+
+### Access
+Open `http://<NPM-IP>:81` in a browser.
+
+**Default credentials:**
+- Email: (configured during install)
+- Password: (configured during install)
+
+### Key Sections
+
+The NPM web interface is optional for the dynamic proxy system but useful for:
+- Viewing access logs
+- Managing static proxy hosts (if needed)
+- Viewing SSL certificate status
+
+**Note:** The dynamic proxy system bypasses NPM's proxy host configuration. Services are routed based on DNS SRV records, not NPM settings.
+
+---
+
+## 10. Maintenance
+
+### Service Management
 
 ```bash
-systemctl status npm
+# OpenResty status
 systemctl status openresty
+
+# NPM status
+systemctl status npm
+
+# Restart all
+systemctl restart openresty npm
+
+# Test nginx config
+/usr/local/openresty/nginx/sbin/nginx -t
+```
+
+### Certificate Renewal
+
+Certbot handles automatic renewal. To manually renew:
+
+```bash
+certbot renew
+```
+
+To check certificate expiry:
+
+```bash
+openssl x509 -in /etc/ssl/home.example.com/fullchain.pem -noout -dates
+```
+
+### View Logs
+
+```bash
+# Dynamic proxy access
+tail -f /data/logs/dynamic_proxy_access.log
+
+# Dynamic proxy errors
+tail -f /data/logs/dynamic_proxy_error.log
+
+# OpenResty error log
+tail -f /usr/local/openresty/nginx/logs/error.log
+```
+
+### Backup
+
+```bash
+# Full backup
+tar czf npm-backup-$(date +%Y%m%d).tar.gz \
+  /data \
+  /etc/ssl \
+  /etc/letsencrypt
+```
+
+### Restore
+
+```bash
+# Stop services
+systemctl stop openresty npm
+
+# Extract backup
+tar xzf npm-backup-YYYYMMDD.tar.gz -C /
+
+# Restart
+systemctl start openresty npm
 ```
 
 ---
 
 ## 11. Troubleshooting
 
-### Script Cannot Reach NPM
+### 502 Bad Gateway
 
-- Verify the LXC is running: `pct status <CTID>`
-- Confirm port 81 is listening: `pct exec <CTID> -- netstat -tulnp | grep :81`
-- Ensure no firewall blocks port 81 between the script host and LXC
+1. Check SRV record exists:
+   ```bash
+   dig SRV _https._tcp.service.vlan.domain @DNS-IP
+   ```
 
-### Authentication Failed
+2. Check backend A record exists:
+   ```bash
+   dig A service.backend.vlan.domain @DNS-IP
+   ```
 
-- If you already set up an account via the web UI wizard, enter exactly those credentials at the prompt
-- Email addresses are case-sensitive in some NPM versions
-- Check `/var/log/npm-config-<timestamp>.log` for the raw API response
+3. Verify backend service is running:
+   ```bash
+   curl -k https://BACKEND-IP:PORT
+   ```
 
-### Certificate Import Failed
+4. Check Lua error log:
+   ```bash
+   tail -50 /data/logs/dynamic_proxy_error.log
+   ```
 
-- Verify the `.crt` and `.key` files exist at the paths provided
-- Confirm the key matches the certificate: `openssl x509 -noout -modulus -in cert.crt | md5sum` should match `openssl rsa -noout -modulus -in cert.key | md5sum`
-- Check the log file for the raw API error response
+### SSL Certificate Errors
 
-### Proxy Host Returns 502 Bad Gateway
+1. Check certificate exists:
+   ```bash
+   ls -la /etc/ssl/home.example.com/
+   ```
 
-- Confirm the backend service is running and listening
-- Verify the NPM LXC can reach the backend IP (check VLAN routing)
-- Check Nginx error log inside LXC: `tail -f /var/log/nginx/error.log`
+2. Check certificate validity:
+   ```bash
+   openssl x509 -in /etc/ssl/home.example.com/fullchain.pem -noout -dates
+   ```
 
-### Services Not Starting After LXC Reboot
+3. Renew if expired:
+   ```bash
+   certbot renew --force-renewal
+   ```
+
+4. Restart nginx:
+   ```bash
+   systemctl restart openresty
+   ```
+
+### Service Not Proxied (Direct Connection)
+
+This means the A record points to the actual server, not Hermes.
+
+1. Check A record:
+   ```bash
+   dig A service.vlan.domain @DNS-IP
+   ```
+
+2. Should return Hermes IP, not backend IP
+
+### Wrong Protocol (HTTPS to HTTP service)
+
+If connecting to an HTTP-only service via HTTPS backend:
+
+1. Edit `/data/nginx/custom/srv_resolver.lua`
+2. Add port to `http_ports` table:
+   ```lua
+   local http_ports = {
+       [80] = true,
+       [8080] = true,
+       [3000] = true,
+       [YOUR_PORT] = true,  -- Add here
+   }
+   ```
+3. Reload nginx:
+   ```bash
+   systemctl reload openresty
+   ```
+
+### NPM Web UI Not Loading
+
+1. Check npm service:
+   ```bash
+   systemctl status npm
+   ```
+
+2. Check port 81:
+   ```bash
+   ss -tuln | grep :81
+   ```
+
+3. Check firewall:
+   ```bash
+   ufw allow 81/tcp
+   ```
+
+### Nginx Config Test Fails
 
 ```bash
-pct exec <CTID> -- systemctl enable npm openresty
-pct exec <CTID> -- systemctl start npm openresty
+# Test config
+/usr/local/openresty/nginx/sbin/nginx -t
+
+# Check for syntax errors in custom config
+cat /data/nginx/custom/http.conf
+
+# Check Lua syntax
+luajit -bl /data/nginx/custom/srv_resolver.lua
 ```
+
+---
+
+## Integration
+
+This proxy server is designed to work with the [Technitium DNS installer](../../dns-server/). Deploy DNS first, then the proxy.
+
+See the [Master User Manual](../../docs/dns-npm-infrastructure-manual.md) for complete pair deployment documentation.
 
 ---
 

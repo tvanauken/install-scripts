@@ -14,20 +14,22 @@ Scripts 1–3 target Proxmox VE hosts directly. Script 4 targets Raspberry Pi ha
 
 ## Scripts in This Collection
 
-| # | Script | Directory | Target | Purpose |
-|---|--------|-----------|--------|---------|
-| 1 | CLI Tools Installer | [`cli-tools/`](../cli-tools/) | Proxmox VE | Installs 46 CLI tools + X11 deps |
-| 2 | PVE Drive Cleanup & Init | [`pve-drive-init/`](../pve-drive-init/) | Proxmox VE | Wipes drives with remnant data for fresh deployment |
-| 3 | Drive Inventory Generator | [`drive-inventory/`](../drive-inventory/) | Proxmox VE | Scans all drives, generates markdown inventory report |
-| 4 | **Raspberry Pi Setup** | [`pi-setup/`](../pi-setup/) | **Raspberry Pi** | Kali tools + XFCE desktop + performance tuning |
-| 5 | Technitium DNS Server | [`dns-server/`](../dns-server/) | LXC (post-install) | Configures Technitium DNS via API after LXC is deployed |
-| 6 | Nginx Proxy Manager | [`npm-reverse-proxy/`](../npm-reverse-proxy/) | LXC (post-install) | Configures NPM via API after LXC is deployed |
+| # | Script | Directory | Target | Version | Purpose |
+|---|--------|-----------|--------|---------|--------|
+| 1 | CLI Tools Installer | [`cli-tools/`](../cli-tools/) | Proxmox VE | 1.0.0 | Installs 46 CLI tools + X11 deps |
+| 2 | PVE Drive Cleanup & Init | [`pve-drive-init/`](../pve-drive-init/) | Proxmox VE | 1.0.0 | Wipes drives with remnant data for fresh deployment |
+| 3 | Drive Inventory Generator | [`drive-inventory/`](../drive-inventory/) | Proxmox VE | 1.0.0 | Scans all drives, generates markdown inventory report |
+| 4 | **Raspberry Pi Setup** | [`pi-setup/`](../pi-setup/) | **Raspberry Pi** | 1.0.0 | Kali tools + XFCE desktop + performance tuning |
+| 5 | Technitium DNS Server | [`dns-server/`](../dns-server/) | Debian/Ubuntu | **3.0.0** | UniFi survey, root hints, dynamic zones, auto-sync |
+| 6 | Nginx Proxy Manager | [`npm-reverse-proxy/`](../npm-reverse-proxy/) | Debian/Ubuntu | **3.0.0** | Native install, Lua SRV resolver, dynamic SSL proxy |
 
 > ⚠ Script 4 requires **Raspberry Pi hardware** (armhf/arm64). Supported OS: Raspberry Pi OS, Ubuntu Desktop/Server, Kali Linux ARM, Debian ARM.
 > NOT compatible with Proxmox VE or x86/x86_64 systems.
 > Must be run with `sudo bash <(curl -s URL)` — not curl alone.
 
-> ℹ Scripts 5–6 are **post-install configuration scripts**. Install the LXC first from [community-scripts.org](https://community-scripts.org), then run the script to configure it.
+> ℹ Scripts 5–6 now include **full installation scripts** that install and configure from scratch. Also available are post-install scripts for existing installations.
+
+> 📖 See the [DNS & NPM Infrastructure Manual](dns-npm-infrastructure-manual.md) for complete documentation on deploying the DNS + reverse proxy pair.
 
 ---
 
@@ -142,18 +144,27 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 sudo bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pi-setup/pi-setup.sh)
 ```
 
-### Configure Technitium DNS Server (post-install)
+### Install Technitium DNS Server (Full — Recommended)
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/dns-server-install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/technitium-dns-install.sh)
 ```
 
-### Configure Nginx Proxy Manager (post-install)
+### Install Nginx Proxy Manager (Full — Recommended)
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/nginx-proxy-manager-install.sh)
+```
+
+### Configure Technitium DNS Server (post-install only)
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/dns-server-install.sh)
+```
+
+### Configure Nginx Proxy Manager (post-install only)
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
 ```
 
 > **Note:** The pi-setup one-liner requires `sudo bash <(...)` — not bare curl.
-> Scripts 5–6 require the LXC to already be running. Install first from community-scripts.org.
 > All one-liners require the repository to be set to **Public** in GitHub settings.
 
 ---
