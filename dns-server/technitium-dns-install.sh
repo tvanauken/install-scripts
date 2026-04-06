@@ -8,6 +8,7 @@
 # ============================================================================
 #  Installs Technitium DNS Server from scratch on any Debian-based distro.
 #  Configures split-horizon DNS with VLAN zones for UniFi network integration.
+#  PRIVACY: Root hints recursion ONLY - no external forwarders.
 #
 #  Usage:
 #    bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/technitium-dns-install.sh)
@@ -41,9 +42,12 @@ DNS_PASS=""
 PRIMARY_ZONE=""
 VLAN_ZONES=()
 BACKEND_ZONES=()
-FORWARDERS="1.1.1.1,9.9.9.9"
 ENABLE_RFC2136="y"
 API_TOKEN=""
+
+# PRIVACY: This DNS server uses ROOT HINTS recursion ONLY
+# No external forwarders (Google, Cloudflare, Quad9, etc.) are used
+# All DNS queries are resolved directly via the root DNS hierarchy
 
 # Retry settings
 MAX_RETRIES=3
@@ -100,7 +104,6 @@ detect_os() {
     OS_ID="unknown"
   fi
   
-  # Determine package manager
   if command -v apt-get &>/dev/null; then
     PKG_MANAGER="apt"
   elif command -v dnf &>/dev/null; then
@@ -139,7 +142,6 @@ BANNER
 preflight() {
   section "Preflight Checks"
   
-  # Root check
   if [[ $EUID -ne 0 ]]; then
     msg_error "Must be run as root — aborting"
     echo -e "\n${YW}  Run with: sudo bash <(curl -fsSL URL)${CL}\n"
@@ -147,7 +149,6 @@ preflight() {
   fi
   msg_ok "Running as root"
   
-  # OS compatibility
   case "$OS_ID" in
     ubuntu|debian|linuxmint|pop|elementary|zorin|kali|raspbian|armbian)
       msg_ok "Compatible OS detected: ${OS_NAME}"
@@ -157,14 +158,12 @@ preflight() {
       ;;
   esac
   
-  # Package manager
   if [[ "$PKG_MANAGER" != "apt" ]]; then
     msg_error "Only apt-based distributions are supported"
     exit 1
   fi
   msg_ok "APT package manager available"
   
-  # Internet connectivity
   msg_info "Checking internet connectivity"
   if ! retry 3 2 ping -c1 -W3 8.8.8.8 &>/dev/null; then
     if ! retry 3 2 ping -c1 -W3 1.1.1.1 &>/dev/null; then
@@ -174,19 +173,20 @@ preflight() {
   fi
   msg_ok "Internet connectivity confirmed"
   
-  # Check for existing installation
   if systemctl is-active --quiet dns 2>/dev/null; then
     msg_warn "Technitium DNS service already running"
     read -rp "  ${YW}Continue and reconfigure? [y/N]:${CL} " continue_install
     [[ "${continue_install,,}" != "y" ]] && { echo ""; exit 0; }
   fi
   
-  # Get current IP
   DNS_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
   if [[ -z "$DNS_IP" ]]; then
     DNS_IP=$(ip route get 8.8.8.8 2>/dev/null | awk '{print $7; exit}')
   fi
   msg_ok "Detected IP address: ${DNS_IP}"
+  
+  HOSTNAME=$(hostname -s 2>/dev/null || hostname)
+  msg_ok "Detected hostname: ${HOSTNAME}"
 }
 
 # ── Collect Configuration ─────────────────────────────────────────────────────
@@ -197,11 +197,9 @@ collect_config() {
   echo -e "  ${BL}${BLD}for split-horizon DNS with UniFi network integration.${CL}"
   echo ""
   
-  # Confirm/override IP
   read -rp "  ${BL}DNS Server IP address${CL} [${DNS_IP}]: " ip_input
   [[ -n "$ip_input" ]] && DNS_IP="$ip_input"
   
-  # Admin credentials
   echo ""
   echo -e "  ${BL}${BLD}Admin Account:${CL}"
   read -rp "  ${BL}Admin username${CL} [admin]: " DNS_USER
@@ -218,14 +216,12 @@ collect_config() {
     msg_warn "Passwords do not match — try again"
   done
   
-  # Domain configuration
   echo ""
   echo -e "  ${BL}${BLD}Domain Configuration:${CL}"
   echo -e "  ${DGN}Example: For 'home.vanauken.tech', enter 'home.vanauken.tech'${CL}"
   read -rp "  ${BL}Primary domain (your internal zone)${CL}: " PRIMARY_ZONE
   [[ -z "$PRIMARY_ZONE" ]] && { msg_error "Primary domain is required"; exit 1; }
   
-  # VLAN zones
   echo ""
   echo -e "  ${BL}${BLD}VLAN Sub-zones:${CL}"
   echo -e "  ${DGN}Enter VLAN names separated by commas (e.g., dmz,pro,storage,mgmt)${CL}"
@@ -235,39 +231,35 @@ collect_config() {
   if [[ -n "$vlan_input" ]]; then
     IFS=',' read -ra raw_vlans <<< "$vlan_input"
     for vlan in "${raw_vlans[@]}"; do
-      vlan="${vlan//[[:space:]]/}"  # trim whitespace
-      vlan="${vlan,,}"               # lowercase
+      vlan="${vlan//[[:space:]]/}"
+      vlan="${vlan,,}"
       [[ -n "$vlan" ]] && VLAN_ZONES+=("${vlan}.${PRIMARY_ZONE}")
     done
   fi
   
-  # Create backend zones for each VLAN (for SSL proxy integration)
   echo ""
   echo -e "  ${BL}${BLD}Backend Zones (for SSL Proxy Integration):${CL}"
   read -rp "  ${BL}Create backend.* zones for SSL proxy?${CL} [Y/n]: " backend_input
   if [[ "${backend_input,,}" != "n" ]]; then
     BACKEND_ZONES+=("backend.${PRIMARY_ZONE}")
     for vlan_zone in "${VLAN_ZONES[@]}"; do
-      # Extract vlan name from zone
-      local vlan_name="${vlan_zone%%.*}"
       BACKEND_ZONES+=("backend.${vlan_zone}")
     done
   fi
   
-  # Forwarders
   echo ""
-  echo -e "  ${BL}${BLD}Upstream DNS Forwarders:${CL}"
-  read -rp "  ${BL}Forwarders (comma-separated)${CL} [1.1.1.1,9.9.9.9]: " fw_input
-  [[ -n "$fw_input" ]] && FORWARDERS="$fw_input"
+  echo -e "  ${BL}${BLD}DNS Resolution Mode:${CL}"
+  echo -e "  ${GN}  ✔  Root Hints Recursion (Privacy-First)${CL}"
+  echo -e "  ${DGN}      No data sent to Google, Cloudflare, Quad9, or any third party${CL}"
+  echo -e "  ${DGN}      All queries resolved directly via root DNS servers${CL}"
+  echo ""
   
-  # RFC 2136
   read -rp "  ${BL}Enable RFC 2136 dynamic updates?${CL} [Y/n]: " rfc_input
   [[ "${rfc_input,,}" == "n" ]] && ENABLE_RFC2136="n"
   
   echo ""
   msg_ok "Configuration collected"
   
-  # Summary
   echo ""
   echo -e "  ${BL}${BLD}Configuration Summary:${CL}"
   printf "  ${DGN}  Server IP     :${CL} %s\n" "$DNS_IP"
@@ -275,7 +267,7 @@ collect_config() {
   printf "  ${DGN}  Primary zone  :${CL} %s\n" "$PRIMARY_ZONE"
   printf "  ${DGN}  VLAN zones    :${CL} %s\n" "${VLAN_ZONES[*]:-none}"
   printf "  ${DGN}  Backend zones :${CL} %s\n" "${#BACKEND_ZONES[@]} zones"
-  printf "  ${DGN}  Forwarders    :${CL} %s\n" "$FORWARDERS"
+  printf "  ${DGN}  Resolution    :${CL} %s\n" "Root Hints (no external forwarders)"
   printf "  ${DGN}  RFC 2136      :${CL} %s\n" "$ENABLE_RFC2136"
   echo ""
   
@@ -309,7 +301,6 @@ install_prerequisites() {
     fi
   done
   
-  # Install .NET runtime (required for Technitium)
   msg_info "Checking .NET runtime"
   if command -v dotnet &>/dev/null; then
     local dotnet_version
@@ -330,11 +321,9 @@ install_technitium() {
   local installer_url="https://download.technitium.com/dns/DnsServerPortable.tar.gz"
   local install_dir="/opt/technitium"
   
-  # Create directories
   mkdir -p "$install_dir" >> "$LOGFILE" 2>&1
   mkdir -p /var/lib/technitium >> "$LOGFILE" 2>&1
   
-  # Download and extract
   if ! retry 3 5 curl -fsSL "$installer_url" -o /tmp/DnsServerPortable.tar.gz >> "$LOGFILE" 2>&1; then
     msg_error "Failed to download Technitium DNS Server"
     exit 1
@@ -346,7 +335,6 @@ install_technitium() {
   rm -f /tmp/DnsServerPortable.tar.gz
   msg_ok "Extracted to ${install_dir}"
   
-  # Create systemd service
   msg_info "Creating systemd service"
   cat > /etc/systemd/system/dns.service << 'EOF'
 [Unit]
@@ -368,9 +356,7 @@ StandardError=journal
 WantedBy=multi-user.target
 EOF
   
-  # Create start script if it doesn't exist
   if [[ ! -f "$install_dir/start.sh" ]]; then
-    # Find the DnsServerApp directory
     local app_dir
     app_dir=$(find "$install_dir" -name "DnsServerApp.dll" -printf '%h\n' 2>/dev/null | head -1)
     
@@ -382,7 +368,6 @@ exec dotnet DnsServerApp.dll
 EOF
       chmod +x "$install_dir/start.sh"
     else
-      # Use official start method
       cat > "$install_dir/start.sh" << 'EOF'
 #!/bin/bash
 cd /opt/technitium
@@ -391,10 +376,8 @@ if [[ -f "./DnsServerApp" ]]; then
 elif [[ -f "./bin/DnsServerApp" ]]; then
   exec ./bin/DnsServerApp
 else
-  # Find and run
   APP=$(find . -name "DnsServerApp" -type f -executable 2>/dev/null | head -1)
   [[ -n "$APP" ]] && exec "$APP"
-  # Try .NET
   DLL=$(find . -name "DnsServerApp.dll" 2>/dev/null | head -1)
   [[ -n "$DLL" ]] && exec dotnet "$DLL"
 fi
@@ -405,13 +388,11 @@ EOF
   
   msg_ok "Systemd service created"
   
-  # Enable and start
   msg_info "Starting Technitium DNS Server"
   systemctl daemon-reload >> "$LOGFILE" 2>&1
   systemctl enable dns >> "$LOGFILE" 2>&1
   systemctl start dns >> "$LOGFILE" 2>&1
   
-  # Wait for service to start
   local attempts=0
   while (( attempts < 30 )); do
     if curl -s --connect-timeout 2 "http://127.0.0.1:${TECHNITIUM_PORT}/api/user/login" &>/dev/null; then
@@ -433,7 +414,6 @@ configure_dns() {
   
   local api_base="http://127.0.0.1:${TECHNITIUM_PORT}/api"
   
-  # Create admin account
   msg_info "Creating admin account: ${DNS_USER}"
   local response
   response=$(curl -s -X POST "${api_base}/user/createAccount" \
@@ -453,7 +433,6 @@ configure_dns() {
     msg_ok "Admin account setup complete"
   fi
   
-  # Authenticate
   msg_info "Authenticating"
   response=$(curl -s -X POST "${api_base}/user/login" \
     --data-urlencode "user=${DNS_USER}" \
@@ -478,19 +457,48 @@ configure_dns() {
   fi
   msg_ok "Authenticated — token acquired"
   
-  # Configure server settings
-  msg_info "Configuring server settings"
+  # Configure server settings — ROOT HINTS ONLY (matches Zeus production)
+  msg_info "Configuring server settings (root hints recursion)"
+  
   response=$(curl -s -X POST "${api_base}/settings/set" \
     --data-urlencode "token=${API_TOKEN}" \
-    --data-urlencode "recursion=AllowAll" \
-    --data-urlencode "forwarders=${FORWARDERS}" \
-    --data-urlencode "forwarderProtocol=Udp" \
+    --data-urlencode "dnsServerDomain=${HOSTNAME}.${PRIMARY_ZONE}" \
+    --data-urlencode "recursion=AllowOnlyForPrivateNetworks" \
+    --data-urlencode "forwarders=" \
     --data-urlencode "preferIPv6=false" \
+    --data-urlencode "dnssecValidation=true" \
+    --data-urlencode "qnameMinimization=true" \
+    --data-urlencode "resolverRetries=2" \
+    --data-urlencode "resolverTimeout=1500" \
+    --data-urlencode "resolverConcurrency=3" \
+    --data-urlencode "saveCache=true" \
+    --data-urlencode "serveStale=true" \
+    --data-urlencode "serveStaleTtl=259200" \
+    --data-urlencode "cacheMaximumEntries=40000" \
+    --data-urlencode "cacheMinimumRecordTtl=10" \
+    --data-urlencode "cacheMaximumRecordTtl=604800" \
+    --data-urlencode "cacheNegativeRecordTtl=300" \
+    --data-urlencode "cachePrefetchEligibility=2" \
+    --data-urlencode "cachePrefetchTrigger=9" \
     --data-urlencode "enableLogging=true" \
+    --data-urlencode "logQueries=true" \
     2>>"$LOGFILE")
   
   log "Settings response: $response"
-  msg_ok "Recursion enabled, forwarders set: ${FORWARDERS}"
+  msg_ok "Root hints recursion enabled (no external forwarders)"
+  
+  msg_info "Configuring DNS blocking"
+  response=$(curl -s -X POST "${api_base}/settings/set" \
+    --data-urlencode "token=${API_TOKEN}" \
+    --data-urlencode "enableBlocking=true" \
+    --data-urlencode "blockingType=NxDomain" \
+    --data-urlencode "allowTxtBlockingReport=true" \
+    --data-urlencode "blockListUrls=https://gitlab.com/hagezi/mirror/-/raw/main/dns-blocklists/adblock/multi.txt,https://gitlab.com/hagezi/mirror/-/raw/main/dns-blocklists/adblock/tif.txt,https://gitlab.com/hagezi/mirror/-/raw/main/dns-blocklists/adblock/fake.txt" \
+    --data-urlencode "blockListUpdateIntervalHours=24" \
+    2>>"$LOGFILE")
+  
+  log "Blocking settings response: $response"
+  msg_ok "DNS blocking enabled with hagezi blocklists"
 }
 
 # ── Create DNS Zones ──────────────────────────────────────────────────────────
@@ -524,7 +532,6 @@ create_zones() {
       msg_warn "Zone [${zone}]: ${err}"
     fi
     
-    # Enable RFC 2136 if requested
     if [[ "$ENABLE_RFC2136" == "y" ]]; then
       response=$(curl -s -X POST "${api_base}/zones/options/set" \
         --data-urlencode "token=${API_TOKEN}" \
@@ -558,7 +565,6 @@ create_reverse_zones() {
     subnet="${subnet//[[:space:]]/}"
     [[ -z "$subnet" ]] && continue
     
-    # Convert to reverse zone format
     IFS='.' read -ra octets <<< "$subnet"
     local reverse_zone=""
     for (( i=${#octets[@]}-1; i>=0; i-- )); do
@@ -582,7 +588,6 @@ create_reverse_zones() {
     if [[ "$status" == "ok" ]]; then
       msg_ok "Reverse zone created: ${reverse_zone}"
       
-      # Enable RFC 2136
       if [[ "$ENABLE_RFC2136" == "y" ]]; then
         curl -s -X POST "${api_base}/zones/options/set" \
           --data-urlencode "token=${API_TOKEN}" \
@@ -621,31 +626,27 @@ configure_firewall() {
 verify_installation() {
   section "Verification"
   
-  # Service status
   if systemctl is-active --quiet dns; then
     msg_ok "DNS service is running"
   else
     msg_error "DNS service is not running"
   fi
   
-  # API accessibility
   if curl -s --connect-timeout 3 "http://127.0.0.1:${TECHNITIUM_PORT}/api/user/login" &>/dev/null; then
     msg_ok "API is accessible on port ${TECHNITIUM_PORT}"
   else
     msg_error "API is not accessible"
   fi
   
-  # DNS resolution test
   if command -v dig &>/dev/null; then
-    msg_info "Testing DNS resolution"
-    if dig @127.0.0.1 google.com +short +time=3 >> "$LOGFILE" 2>&1; then
-      msg_ok "DNS resolution working (forwarding)"
+    msg_info "Testing DNS resolution (root hints)"
+    if dig @127.0.0.1 example.com +short +time=10 +tries=2 >> "$LOGFILE" 2>&1; then
+      msg_ok "DNS resolution working (root hints recursion)"
     else
-      msg_warn "DNS forwarding test failed — check forwarders"
+      msg_warn "Initial resolution slow — root hints cache warming up"
     fi
   fi
   
-  # Zone verification
   local zone_count
   zone_count=$(curl -s "http://127.0.0.1:${TECHNITIUM_PORT}/api/zones/list?token=${API_TOKEN}" 2>/dev/null | jq -r '.response.zones | length' 2>/dev/null || echo "0")
   msg_ok "Total zones configured: ${zone_count}"
@@ -672,7 +673,13 @@ summary() {
   if [[ ${#BACKEND_ZONES[@]} -gt 0 ]]; then
     printf "  ${DGN}Backend zones:${CL}  ${BL}%d zones${CL}\n" "${#BACKEND_ZONES[@]}"
   fi
-  printf "  ${DGN}Forwarders   :${CL}  ${BL}${FORWARDERS}${CL}\n"
+  printf "  ${DGN}Server FQDN  :${CL}  ${BL}${HOSTNAME}.${PRIMARY_ZONE}${CL}\n"
+  printf "  ${DGN}Resolution   :${CL}  ${BL}Root Hints (privacy-first, no third-party DNS)${CL}\n"
+  printf "  ${DGN}Recursion    :${CL}  ${BL}Private networks only${CL}\n"
+  printf "  ${DGN}DNSSEC       :${CL}  ${BL}Enabled${CL}\n"
+  printf "  ${DGN}QNAME Min.   :${CL}  ${BL}Enabled (enhanced privacy)${CL}\n"
+  printf "  ${DGN}Blocking     :${CL}  ${BL}Enabled (hagezi blocklists)${CL}\n"
+  printf "  ${DGN}Serve Stale  :${CL}  ${BL}Enabled (3 day TTL)${CL}\n"
   printf "  ${DGN}RFC 2136     :${CL}  ${BL}${rfc_status}${CL}\n"
   echo ""
   echo -e "  ${YW}Next steps:${CL}"
