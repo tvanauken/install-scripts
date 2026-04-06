@@ -7,8 +7,7 @@
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
 #  Installs Nginx Proxy Manager natively (no Docker) on any Debian-based distro.
-#  Configures dynamic SSL proxy with wildcard Let's Encrypt certificates
-#  using SRV record-based backend resolution via Lua.
+#  Obtains wildcard Let's Encrypt certificate via Cloudflare DNS challenge.
 #
 #  Template: Hermes production server
 #
@@ -18,6 +17,7 @@
 
 set -o pipefail
 
+# ── Colour Palette ────────────────────────────────────────────────────────────
 RD="\033[01;31m"
 YW="\033[33m"
 GN="\033[1;92m"
@@ -27,12 +27,14 @@ CL="\033[m"
 BLD="\033[1m"
 TAB="    "
 
+# ── Globals ───────────────────────────────────────────────────────────────────
 SCRIPT_VERSION="3.0.0"
 LOGFILE="/var/log/npm-install-$(date +%Y%m%d-%H%M%S).log"
 NPM_PORT="81"
 NPM_DATA_DIR="/data/nginx"
 NPM_SSL_DIR="/etc/ssl"
 
+# Configuration
 NPM_IP=""
 ADMIN_EMAIL=""
 ADMIN_PASS=""
@@ -41,6 +43,7 @@ DNS_SERVER_IP=""
 CF_API_TOKEN=""
 API_TOKEN=""
 
+# ── Trap / Cleanup ────────────────────────────────────────────────────────────
 cleanup() {
   local code=$?
   tput cnorm 2>/dev/null || true
@@ -51,6 +54,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
 log()       { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$LOGFILE"; }
 msg_info()  { printf "${TAB}${YW}◆  %s...${CL}\r" "$1"; log "INFO: $1"; }
 msg_ok()    { printf "${TAB}${GN}✔  %-55s${CL}\n" "$1"; log "OK: $1"; }
@@ -58,6 +62,7 @@ msg_error() { printf "${TAB}${RD}✘  %s${CL}\n" "$1"; log "ERROR: $1"; }
 msg_warn()  { printf "${TAB}${YW}⚠  %s${CL}\n" "$1"; log "WARN: $1"; }
 section()   { printf "\n${BL}${BLD}  ── %s ──────────────────────────────────────────${CL}\n\n" "$1"; log "SECTION: $1"; }
 
+# ── OS Detection ──────────────────────────────────────────────────────────────
 detect_os() {
   if [[ -f /etc/os-release ]]; then
     . /etc/os-release
@@ -73,6 +78,7 @@ detect_os() {
   fi
 }
 
+# ── Header ────────────────────────────────────────────────────────────────────
 header_info() {
   clear
   echo -e "${BL}${BLD}"
@@ -94,6 +100,7 @@ BANNER
   log "OS: $OS_NAME $OS_VERSION ($OS_CODENAME) - ID: $OS_ID"
 }
 
+# ── Preflight Checks ──────────────────────────────────────────────────────────
 preflight() {
   section "Preflight Checks"
   
@@ -120,6 +127,7 @@ preflight() {
   msg_ok "Detected IP address: ${NPM_IP}"
 }
 
+# ── Collect Configuration ─────────────────────────────────────────────────────
 collect_config() {
   section "Configuration"
   
@@ -130,6 +138,7 @@ collect_config() {
   read -rp "  ${BL}NPM Server IP address${CL} [${NPM_IP}]: " ip_input
   [[ -n "$ip_input" ]] && NPM_IP="$ip_input"
   
+  # Admin credentials
   echo ""
   echo -e "  ${BL}${BLD}Admin Account:${CL}"
   read -rp "  ${BL}Admin email address${CL}: " ADMIN_EMAIL
@@ -141,17 +150,14 @@ collect_config() {
     msg_warn "Password must be at least 8 characters"
   done
   
+  # Wildcard domain
   echo ""
   echo -e "  ${BL}${BLD}Wildcard Certificate Domain:${CL}"
   echo -e "  ${DGN}Example: For '*.home.example.com', enter 'home.example.com'${CL}"
   read -rp "  ${BL}Domain (without wildcard)${CL}: " WILDCARD_DOMAIN
   [[ -z "$WILDCARD_DOMAIN" ]] && { msg_error "Domain is required"; exit 1; }
   
-  echo ""
-  echo -e "  ${BL}${BLD}Internal DNS Server (for SRV record resolution):${CL}"
-  read -rp "  ${BL}DNS Server IP${CL}: " DNS_SERVER_IP
-  [[ -z "$DNS_SERVER_IP" ]] && { msg_error "DNS server IP is required"; exit 1; }
-  
+  # Cloudflare for DNS challenge
   echo ""
   echo -e "  ${BL}${BLD}Cloudflare API Token (for Let's Encrypt DNS challenge):${CL}"
   echo -e "  ${DGN}Create at: https://dash.cloudflare.com/profile/api-tokens${CL}"
@@ -164,7 +170,6 @@ collect_config() {
   printf "  ${DGN}  Server IP      :${CL} %s\n" "$NPM_IP"
   printf "  ${DGN}  Admin email    :${CL} %s\n" "$ADMIN_EMAIL"
   printf "  ${DGN}  Wildcard domain:${CL} *.%s\n" "$WILDCARD_DOMAIN"
-  printf "  ${DGN}  DNS Server     :${CL} %s\n" "$DNS_SERVER_IP"
   printf "  ${DGN}  Auto SSL       :${CL} %s\n" "$([[ -n "$CF_API_TOKEN" ]] && echo "Yes" || echo "Manual")"
   echo ""
   
@@ -172,6 +177,7 @@ collect_config() {
   [[ "${proceed,,}" == "n" ]] && exit 0
 }
 
+# ── Install Prerequisites ─────────────────────────────────────────────────────
 install_prerequisites() {
   section "Installing Prerequisites"
   
@@ -192,6 +198,7 @@ install_prerequisites() {
   done
 }
 
+# ── Install OpenResty ─────────────────────────────────────────────────────────
 install_openresty() {
   section "Installing OpenResty"
   
@@ -211,6 +218,7 @@ install_openresty() {
   msg_ok "OpenResty service started"
 }
 
+# ── Install NPM ───────────────────────────────────────────────────────────────
 install_npm() {
   section "Installing Nginx Proxy Manager"
   
@@ -236,11 +244,13 @@ install_npm() {
   npm install >> "$LOGFILE" 2>&1
   msg_ok "NPM built"
   
+  # Create directories
   mkdir -p /data/nginx/custom
   mkdir -p /data/logs
   mkdir -p /data/letsencrypt
   mkdir -p "${NPM_SSL_DIR}/${WILDCARD_DOMAIN}"
   
+  # Create systemd service
   msg_info "Creating systemd service"
   cat > /etc/systemd/system/npm.service << 'EOF'
 [Unit]
@@ -265,6 +275,7 @@ EOF
   systemctl start npm >> "$LOGFILE" 2>&1
   msg_ok "NPM service created and started"
   
+  # Wait for NPM to start
   msg_info "Waiting for NPM to start"
   local attempts=0
   while (( attempts < 60 )); do
@@ -280,6 +291,7 @@ EOF
   exit 1
 }
 
+# ── Configure NPM via API ─────────────────────────────────────────────────────
 configure_npm() {
   section "Configuring Nginx Proxy Manager"
   
@@ -334,6 +346,7 @@ configure_npm() {
   msg_ok "Authenticated"
 }
 
+# ── Request Wildcard Certificate ──────────────────────────────────────────────
 request_certificate() {
   [[ -z "$CF_API_TOKEN" ]] && { msg_warn "Skipping auto-certificate — manual setup required"; return; }
   
@@ -341,7 +354,6 @@ request_certificate() {
   
   local cert_dir="${NPM_SSL_DIR}/${WILDCARD_DOMAIN}"
   mkdir -p "$cert_dir"
-  mkdir -p /etc/letsencrypt
   
   msg_info "Creating Cloudflare credentials"
   cat > /etc/letsencrypt/cloudflare.ini << EOF
@@ -364,10 +376,12 @@ EOF
   if [[ $? -eq 0 ]]; then
     msg_ok "Certificate issued successfully"
     
+    # Copy to standard location
     cp "/etc/letsencrypt/live/${WILDCARD_DOMAIN}/fullchain.pem" "$cert_dir/fullchain.pem"
     cp "/etc/letsencrypt/live/${WILDCARD_DOMAIN}/privkey.pem" "$cert_dir/key.pem"
     msg_ok "Certificate copied to ${cert_dir}"
     
+    # Set up auto-renewal
     cat > /etc/cron.d/certbot-renew << EOF
 0 0,12 * * * root certbot renew --quiet --post-hook "systemctl reload openresty"
 EOF
@@ -377,173 +391,36 @@ EOF
   fi
 }
 
-configure_dynamic_proxy() {
-  section "Configuring Dynamic SSL Proxy"
+# ── Import Wildcard Certificate to NPM ─────────────────────────────────────────
+import_certificate_to_npm() {
+  [[ -z "$CF_API_TOKEN" ]] && return
+  [[ ! -f "${NPM_SSL_DIR}/${WILDCARD_DOMAIN}/fullchain.pem" ]] && return
   
-  local custom_dir="/data/nginx/custom"
-  mkdir -p "$custom_dir"
-  mkdir -p /data/logs
+  section "Importing Certificate to NPM"
   
-  msg_info "Creating SRV resolver module"
-  cat > "${custom_dir}/srv_resolver.lua" << LUAEOF
-local resolver = require "resty.dns.resolver"
-
-local _M = {}
-
-local DNS_SERVER = "${DNS_SERVER_IP}"
-local DNS_PORT = 53
-
-function _M.resolve_backend(host)
-    local r, err = resolver:new{
-        nameservers = {{DNS_SERVER, DNS_PORT}},
-        retrans = 3,
-        timeout = 2000,
-    }
-    
-    if not r then
-        ngx.log(ngx.ERR, "failed to create resolver: ", err)
-        return nil, nil, "resolver creation failed"
-    end
-    
-    local srv_name = "_https._tcp." .. host
-    local answers, err = r:query(srv_name, {qtype = r.TYPE_SRV})
-    
-    if not answers then
-        return nil, nil, "SRV query failed"
-    end
-    
-    if answers.errcode then
-        return nil, nil, answers.errstr
-    end
-    
-    local best_srv = nil
-    for i, ans in ipairs(answers) do
-        if ans.type == r.TYPE_SRV then
-            if not best_srv or ans.priority < best_srv.priority then
-                best_srv = ans
-            end
-        end
-    end
-    
-    if not best_srv then
-        return nil, nil, "no SRV record"
-    end
-    
-    local target = best_srv.target
-    local port = best_srv.port
-    
-    local ip_answers, err = r:query(target, {qtype = r.TYPE_A})
-    
-    if not ip_answers or ip_answers.errcode then
-        return nil, nil, "target resolution failed"
-    end
-    
-    local ip = nil
-    for i, ans in ipairs(ip_answers) do
-        if ans.type == r.TYPE_A then
-            ip = ans.address
-            break
-        end
-    end
-    
-    if not ip then
-        return nil, nil, "no A record for target"
-    end
-    
-    ngx.log(ngx.INFO, "Resolved ", host, " -> ", ip, ":", port)
-    return ip, port, nil
-end
-
-return _M
-LUAEOF
-  msg_ok "SRV resolver module created"
+  local api_base="http://127.0.0.1:${NPM_PORT}/api"
   
-  msg_info "Creating dynamic proxy configuration"
-  local escaped_domain="${WILDCARD_DOMAIN//./\\.}"
-  cat > "${custom_dir}/http.conf" << EOF
-lua_package_path "/data/nginx/custom/?.lua;;";
-
-map \$http_upgrade \$connection_upgrade {
-    default upgrade;
-    '' close;
-}
-
-server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    
-    server_name ~^(?<subdomain>.+)\.${escaped_domain}\$;
-    
-    ssl_certificate ${NPM_SSL_DIR}/${WILDCARD_DOMAIN}/fullchain.pem;
-    ssl_certificate_key ${NPM_SSL_DIR}/${WILDCARD_DOMAIN}/key.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers off;
-    ssl_session_cache shared:DYNSSL:10m;
-    ssl_session_timeout 1d;
-    
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    
-    access_log /data/logs/dynamic_proxy_access.log;
-    error_log /data/logs/dynamic_proxy_error.log;
-    
-    resolver ${DNS_SERVER_IP} valid=30s ipv6=off;
-    resolver_timeout 5s;
-    
-    set \$backend_upstream "";
-    
-    location / {
-        access_by_lua_block {
-            local srv = require "srv_resolver"
-            local host = ngx.var.host
-            
-            local ip, port, err = srv.resolve_backend(host)
-            
-            if not ip then
-                ngx.log(ngx.ERR, "Backend resolution failed for ", host, ": ", err)
-                ngx.exit(502)
-                return
-            end
-            
-            local protocol = "https"
-            local http_ports = {80, 5380, 8080, 3000, 9000, 81}
-            for _, p in ipairs(http_ports) do
-                if port == p then
-                    protocol = "http"
-                    break
-                end
-            end
-            
-            ngx.var.backend_upstream = protocol .. "://" .. ip .. ":" .. port
-        }
-        
-        proxy_pass \$backend_upstream;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \$connection_upgrade;
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-        proxy_buffering off;
-    }
-}
-EOF
-  msg_ok "Dynamic proxy configuration created"
+  msg_info "Importing wildcard certificate to NPM"
   
-  msg_info "Verifying nginx configuration"
-  if /usr/local/openresty/nginx/sbin/nginx -t >> "$LOGFILE" 2>&1; then
-    msg_ok "Nginx configuration valid"
-    systemctl restart openresty >> "$LOGFILE" 2>&1
-    msg_ok "OpenResty restarted"
+  local cert_content key_content
+  cert_content=$(cat "${NPM_SSL_DIR}/${WILDCARD_DOMAIN}/fullchain.pem" | jq -Rs .)
+  key_content=$(cat "${NPM_SSL_DIR}/${WILDCARD_DOMAIN}/key.pem" | jq -Rs .)
+  
+  local response
+  response=$(curl -s -X POST "${api_base}/nginx/certificates" \
+    -H "Authorization: Bearer ${API_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{\"nice_name\":\"Wildcard ${WILDCARD_DOMAIN}\",\"provider\":\"other\",\"certificate\":${cert_content},\"certificate_key\":${key_content}}" 2>>"$LOGFILE")
+  
+  if echo "$response" | jq -e '.id' &>/dev/null; then
+    msg_ok "Certificate imported to NPM — ready to assign to proxy hosts"
   else
-    msg_error "Nginx configuration invalid — check ${custom_dir}/http.conf"
+    msg_warn "Certificate import failed — add manually via Web UI"
+    log "Certificate import response: $response"
   fi
 }
 
+# ── Configure Firewall ────────────────────────────────────────────────────────
 configure_firewall() {
   section "Configuring Firewall"
   
@@ -558,6 +435,7 @@ configure_firewall() {
   fi
 }
 
+# ── Verification ──────────────────────────────────────────────────────────────
 verify_installation() {
   section "Verification"
   
@@ -579,10 +457,6 @@ verify_installation() {
     msg_error "Web UI is not accessible"
   fi
   
-  if [[ -f "/data/nginx/custom/http.conf" ]]; then
-    msg_ok "Dynamic proxy configuration present"
-  fi
-  
   if [[ -f "${NPM_SSL_DIR}/${WILDCARD_DOMAIN}/fullchain.pem" ]]; then
     msg_ok "Wildcard certificate installed"
   else
@@ -590,6 +464,7 @@ verify_installation() {
   fi
 }
 
+# ── Summary ───────────────────────────────────────────────────────────────────
 summary() {
   local cert_status
   if [[ -f "${NPM_SSL_DIR}/${WILDCARD_DOMAIN}/fullchain.pem" ]]; then
@@ -606,20 +481,18 @@ summary() {
   printf "  ${DGN}Web UI        :${CL}  ${BL}http://${NPM_IP}:81${CL}\n"
   printf "  ${DGN}Admin         :${CL}  ${BL}${ADMIN_EMAIL}${CL}\n"
   printf "  ${DGN}Wildcard Cert :${CL}  ${BL}*.${WILDCARD_DOMAIN} — ${cert_status}${CL}\n"
-  printf "  ${DGN}Dynamic Proxy :${CL}  ${BL}Configured${CL}\n"
-  printf "  ${DGN}DNS Resolver  :${CL}  ${BL}${DNS_SERVER_IP}${CL}\n"
+  printf "  ${DGN}Certificate   :${CL}  ${BL}Imported to NPM${CL}\n"
   echo ""
-  echo -e "  ${YW}How Dynamic SSL Proxy Works:${CL}"
-  echo -e "  ${DGN}  1. Browser requests https://server.vlan.${WILDCARD_DOMAIN}${CL}"
-  echo -e "  ${DGN}  2. DNS returns this server's IP (${NPM_IP})${CL}"
-  echo -e "  ${DGN}  3. Wildcard certificate validates the connection${CL}"
-  echo -e "  ${DGN}  4. Lua queries SRV record for backend target/port${CL}"
-  echo -e "  ${DGN}  5. Request proxied to real server with valid SSL${CL}"
+  echo -e "  ${YW}To add a proxy host:${CL}"
+  echo -e "  ${DGN}  1. Open Web UI → Hosts → Proxy Hosts → Add${CL}"
+  echo -e "  ${DGN}  2. Domain: anyname.${WILDCARD_DOMAIN}${CL}"
+  echo -e "  ${DGN}  3. Forward: backend IP and port${CL}"
+  echo -e "  ${DGN}  4. SSL tab: select 'Wildcard ${WILDCARD_DOMAIN}' certificate${CL}"
+  echo -e "  ${DGN}  5. Enable Force SSL, HTTP/2${CL}"
+  echo -e "  ${DGN}  6. Save${CL}"
   echo ""
-  echo -e "  ${YW}Required DNS Records (per server):${CL}"
-  echo -e "  ${DGN}  A Record   : server.vlan.${WILDCARD_DOMAIN} → ${NPM_IP}${CL}"
-  echo -e "  ${DGN}  Backend A  : server.backend.vlan.${WILDCARD_DOMAIN} → Real IP${CL}"
-  echo -e "  ${DGN}  SRV Record : _https._tcp.server.vlan.${WILDCARD_DOMAIN} → 0 0 PORT backend${CL}"
+  echo -e "  ${YW}DNS Setup:${CL}"
+  echo -e "  ${DGN}  Public DNS: anyname.${WILDCARD_DOMAIN} → ${NPM_IP} (or your public IP)${CL}"
   echo ""
   echo -e "${DGN}${BLD}  ────────────────────────────────────────────────────────────────${CL}"
   echo -e "${DGN}  Created by : Thomas Van Auken — Van Auken Tech${CL}"
@@ -627,6 +500,7 @@ summary() {
   echo ""
 }
 
+# ── Main ──────────────────────────────────────────────────────────────────────
 main() {
   detect_os
   header_info
@@ -637,7 +511,7 @@ main() {
   install_npm
   configure_npm
   request_certificate
-  configure_dynamic_proxy
+  import_certificate_to_npm
   configure_firewall
   verify_installation
   summary

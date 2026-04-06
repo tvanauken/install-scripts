@@ -6,22 +6,12 @@
 
 ---
 
-## Version History
-
-| Version | Date | Changes |
-|---------|------|------|
-| 3.0.0 | 2026-04-05 | Native install (no Docker), Lua SRV resolver, dynamic backend routing |
-| 2.0.0 | 2026-04-05 | Wildcard SSL, SRV-based routing |
-| 1.1.0 | 2026-03-31 | Initial release (deprecated) |
-
----
-
 ## Scripts Available
 
 ### 1. Full Installation Script (Recommended)
 **Script:** [`nginx-proxy-manager-install.sh`](nginx-proxy-manager-install.sh)
 
-Installs NPM natively (no Docker) with dynamic SSL proxy configuration.
+Installs NPM natively (no Docker) with wildcard SSL certificate.
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/nginx-proxy-manager-install.sh)
@@ -29,11 +19,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 **Features:**
 - **Native installation** using OpenResty (no Docker)
-- Installs Node.js and NPM from source
 - Requests wildcard Let's Encrypt certificate (Cloudflare DNS challenge)
-- **Lua SRV resolver** for dynamic backend routing
-- Auto-protocol detection (HTTP/HTTPS)
-- Routes HTTPS requests to backends via SRV records
+- Imports certificate to NPM automatically
 - Configures firewall (UFW/firewalld)
 
 ### 2. Post-Install Configuration Script
@@ -47,26 +34,25 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 ---
 
-## How the Dynamic SSL Proxy Works
+## How It Works
 
-1. Browser requests `https://server.vlan.home.example.com`
-2. DNS returns the proxy server's IP (not the real server)
-3. Wildcard certificate validates the connection
-4. Lua script queries SRV record: `_https._tcp.server.vlan.home.example.com`
-5. SRV record returns backend target and port
-6. Request is proxied to the real server with valid SSL
-
-**Result:** Any internal server gets valid HTTPS without individual certificates or manual NPM configuration.
+1. External user requests `https://anyname.home.example.com`
+2. Public DNS resolves to NPM server IP
+3. NPM matches the hostname to a configured proxy host
+4. Wildcard certificate validates the connection
+5. Request is proxied to the backend server
 
 ---
 
-## Required DNS Records (per server)
+## Adding a Proxy Host
 
-| Record Type | Name | Value |
-|-------------|------|-------|
-| A Record | `server.vlan.domain.tld` | Proxy IP (e.g., `172.16.250.9`) |
-| Backend A | `server.backend.vlan.domain.tld` | Real server IP |
-| SRV Record | `_https._tcp.server.vlan.domain.tld` | `0 0 PORT backend-target` |
+1. Open NPM Web UI → **Hosts** → **Proxy Hosts** → **Add**
+2. **Domain Names:** `anyname.home.example.com`
+3. **Forward Hostname/IP:** backend server IP
+4. **Forward Port:** backend service port
+5. **SSL tab:** Select the wildcard certificate
+6. Enable **Force SSL** and **HTTP/2 Support**
+7. **Save**
 
 ---
 
@@ -79,26 +65,24 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 | Admin password | Min 8 characters | (secure) |
 | Wildcard domain | For SSL cert | `home.example.com` |
 | Cloudflare API token | Zone:DNS:Edit | (token) |
-| DNS Server IP | For SRV lookups | `172.16.250.8` |
 
 ---
 
-## File Locations
+## DNS Setup
 
-| File | Purpose |
-|------|--------|
-| `/data/nginx/custom/srv_resolver.lua` | Lua SRV resolver module |
-| `/data/nginx/custom/http.conf` | Custom nginx config |
-| `/etc/ssl/<domain>/fullchain.pem` | Wildcard certificate |
-| `/data/logs/dynamic_proxy_*.log` | Proxy access/error logs |
+Create an A record for each service you want to proxy:
+
+```
+anyname.home.example.com  A  <NPM-PUBLIC-IP>
+```
+
+The wildcard certificate covers `*.home.example.com`, so any subdomain works.
 
 ---
 
 ## Integration
 
-Use with the [Technitium DNS installer](../dns-server/) for complete split-horizon DNS + SSL proxy.
-
-See the [Master User Manual](../docs/dns-npm-infrastructure-manual.md) for complete documentation.
+Use with the [Technitium DNS installer](../dns-server/) for internal DNS resolution.
 
 ---
 *Van Auken Tech · Thomas Van Auken*
