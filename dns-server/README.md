@@ -1,107 +1,70 @@
-# Technitium DNS Server — Installation Scripts
+# Technitium DNS — Post-Install Configuration
 
 > Created by: Thomas Van Auken — Van Auken Tech  
-> Version: 3.0.0  
-> Tested on: Ubuntu 22.04+, Debian 12+, Proxmox VE 8.x/9.x
+> Version: 1.0.0
 
 ---
 
-## Version History
+## Overview
 
-| Version | Date | Changes |
-|---------|------|------|
-| 3.0.0 | 2026-04-05 | Root hints only (no external forwarders), UniFi survey, dynamic zones |
-| 2.0.0 | 2026-04-05 | DNSSEC, hagezi blocklists |
-| 1.1.0 | 2026-03-31 | Initial release (deprecated) |
+Configures a fresh Technitium DNS LXC (installed via Proxmox community-scripts) for UniFi network integration with privacy-first DNS.
 
----
+## Pre-requisites
 
-## Scripts Available
+1. **Fresh Technitium LXC** via community-scripts:
+   ```bash
+   bash -c "$(curl -fsSL https://community-scripts.github.io/ProxmoxVE/scripts/technitium.sh)"
+   ```
+2. **UniFi controller** accessible on the network
+3. **Root access** to the LXC
 
-### 1. Full Installation Script (Recommended)
-**Script:** [`technitium-dns-install.sh`](technitium-dns-install.sh)
-
-Installs Technitium DNS Server from scratch with UniFi network discovery.
+## Usage
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/technitium-dns-install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/technitium-dns-configure.sh)
 ```
 
-**Features:**
-- Installs Technitium DNS Server from official source
-- **Surveys UniFi Controller** to discover all networks/VLANs
-- **Root hints recursion only** — no data transmitted to external DNS (Google, Cloudflare, etc.)
-- Dynamically creates zones for each discovered network
-- Creates backend zones for reverse proxy integration
-- DNSSEC validation and QNAME minimization enabled
-- Hagezi ad/tracking blocklists
-- Deploys `unifi-zeus-sync.py` for automatic A/PTR record sync
-- Cron job runs sync every 5 minutes
+## What It Does
 
-### 2. Post-Install Configuration Script
-**Script:** [`dns-server-install.sh`](dns-server-install.sh)
-
-For use when Technitium is already installed (e.g., via community-scripts.org).
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/dns-server-install.sh)
-```
-
----
-
-## Zone Structure
-
-The full installer dynamically discovers your UniFi networks and creates zones:
-
-```
-home.example.com                  (primary zone)
-├── mgmt.home.example.com         (discovered VLAN zone)
-├── servers.home.example.com      (discovered VLAN zone)
-├── iot.home.example.com          (discovered VLAN zone)
-├── backend.mgmt.home.example.com (for SSL proxy)
-└── backend.servers.home.example.com
-```
-
-**Backend zones** store real server IPs while public zones point to the proxy.
-
----
+1. **Surveys UniFi** — discovers all networks and VLANs
+2. **Configures DNS settings:**
+   - Root hints recursion (no external forwarders — privacy-first)
+   - DNSSEC validation
+   - QNAME minimization
+   - Cache: 40,000 entries, stale serving, prefetch
+   - Blocking enabled
+3. **Creates zones** for each discovered network
+4. **Deploys sync script** — `unifi-zeus-sync.py`
+5. **Sets up cron** — runs every 5 minutes
 
 ## Configuration Prompts
 
 | Setting | Description | Example |
 |---------|-------------|--------|
-| DNS Server IP | This server's IP | `172.16.250.8` |
-| Admin username | Technitium admin | `admin` |
-| Admin password | Min 8 characters | (secure) |
+| Technitium username | Admin account | `admin` |
+| Technitium password | Set during install | |
 | Base domain | Your internal domain | `home.example.com` |
-| UniFi Controller URL | Full URL | `https://192.168.1.1` |
-| UniFi username | API user | `customapi` |
+| DNS server hostname | This server's FQDN | `dns.dmz.home.example.com` |
+| UniFi URL | Controller address | `https://192.168.1.1` |
+| UniFi username | API user recommended | `customapi` |
 | UniFi password | | |
-| UniFi site | Usually default | `default` |
-| Hermes/NPM IP | Reverse proxy IP | `172.16.250.9` |
-| Reverse subnets | For PTR records | `172.16.250,192.168.1` |
-
----
+| NPM/Hermes IP | Reverse proxy (optional) | `172.16.250.9` |
 
 ## UniFi Sync
 
-The sync script (`/usr/local/bin/unifi-zeus-sync.py`) automatically:
-- Reads all DHCP clients from UniFi
-- Creates A records in the appropriate zone
+The sync script automatically:
+- Reads DHCP clients from UniFi
+- Creates A records in appropriate zones
 - Creates PTR records for reverse lookups
-- Removes stale records for devices no longer present
+- Removes stale records when devices leave
 
 **Log:** `/var/log/unifi-zeus-sync.log`  
 **Config:** `/etc/unifi-zeus-sync.conf`  
 **State:** `/var/lib/unifi-zeus-sync/state.json`
 
----
-
 ## Integration
 
-For HTTPS access to internal servers with valid SSL, use with the [Nginx Proxy Manager installer](../npm-reverse-proxy/).
-
-See the [Master User Manual](../docs/dns-npm-infrastructure-manual.md) for complete documentation.
+Use with the [NPM configuration script](../npm-reverse-proxy/) for HTTPS access to internal servers.
 
 ---
 *Van Auken Tech · Thomas Van Auken*

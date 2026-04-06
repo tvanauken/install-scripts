@@ -1,88 +1,71 @@
-# Nginx Proxy Manager — Installation Scripts
+# Nginx Proxy Manager — Post-Install Configuration
 
 > Created by: Thomas Van Auken — Van Auken Tech  
-> Version: 3.0.0  
-> Tested on: Ubuntu 22.04+, Debian 12+, Proxmox VE 8.x/9.x
+> Version: 1.0.0
 
 ---
 
-## Scripts Available
+## Overview
 
-### 1. Full Installation Script (Recommended)
-**Script:** [`nginx-proxy-manager-install.sh`](nginx-proxy-manager-install.sh)
+Configures a fresh NPM LXC (installed via Proxmox community-scripts) with wildcard SSL certificate for reverse proxying internal services.
 
-Installs NPM natively (no Docker) with wildcard SSL certificate.
+## Pre-requisites
+
+1. **Fresh NPM LXC** via community-scripts:
+   ```bash
+   bash -c "$(curl -fsSL https://community-scripts.github.io/ProxmoxVE/scripts/nginxproxymanager.sh)"
+   ```
+2. **Cloudflare account** with API token (Zone:DNS:Edit permission)
+3. **Root access** to the LXC
+
+## Usage
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/nginx-proxy-manager-install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-configure.sh)
 ```
 
-**Features:**
-- **Native installation** using OpenResty (no Docker)
-- Requests wildcard Let's Encrypt certificate (Cloudflare DNS challenge)
-- Imports certificate to NPM automatically
-- Configures firewall (UFW/firewalld)
+## What It Does
 
-### 2. Post-Install Configuration Script
-**Script:** [`npm-reverse-proxy-install.sh`](npm-reverse-proxy-install.sh)
-
-For use when NPM is already installed (e.g., via community-scripts.org).
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
-```
-
----
-
-## How It Works
-
-1. External user requests `https://anyname.home.example.com`
-2. Public DNS resolves to NPM server IP
-3. NPM matches the hostname to a configured proxy host
-4. Wildcard certificate validates the connection
-5. Request is proxied to the backend server
-
----
-
-## Adding a Proxy Host
-
-1. Open NPM Web UI → **Hosts** → **Proxy Hosts** → **Add**
-2. **Domain Names:** `anyname.home.example.com`
-3. **Forward Hostname/IP:** backend server IP
-4. **Forward Port:** backend service port
-5. **SSL tab:** Select the wildcard certificate
-6. Enable **Force SSL** and **HTTP/2 Support**
-7. **Save**
-
----
+1. **Updates admin credentials** from default
+2. **Requests wildcard certificate** via Cloudflare DNS challenge
+3. **Imports certificate** to NPM as custom SSL
+4. **Configures auto-renewal** (twice daily)
 
 ## Configuration Prompts
 
 | Setting | Description | Example |
 |---------|-------------|--------|
-| Server IP | This server's IP | `172.16.250.9` |
-| Admin email | NPM login email | `admin@example.com` |
-| Admin password | Min 8 characters | (secure) |
-| Wildcard domain | For SSL cert | `home.example.com` |
-| Cloudflare API token | Zone:DNS:Edit | (token) |
+| Admin email | NPM login | `admin@example.com` |
+| Admin password | Min 8 characters | |
+| Wildcard domain | Without the `*` | `home.example.com` |
+| Cloudflare API token | Zone:DNS:Edit | (from Cloudflare) |
 
----
+## Adding Proxy Hosts
+
+After configuration, add services via NPM Web UI:
+
+1. **Hosts** → **Proxy Hosts** → **Add**
+2. **Domain Names:** `anyname.home.example.com`
+3. **Forward Hostname/IP:** backend server IP
+4. **Forward Port:** backend service port
+5. **SSL tab:** Select your wildcard certificate
+6. Enable **Force SSL** and **HTTP/2**
+7. **Save**
 
 ## DNS Setup
 
-Create an A record for each service you want to proxy:
+For each service, create a public A record:
 
 ```
-anyname.home.example.com  A  <NPM-PUBLIC-IP>
+proxmox.home.example.com  A  <NPM-PUBLIC-IP>
+grafana.home.example.com  A  <NPM-PUBLIC-IP>
 ```
 
-The wildcard certificate covers `*.home.example.com`, so any subdomain works.
-
----
+The wildcard certificate covers all `*.home.example.com` subdomains.
 
 ## Integration
 
-Use with the [Technitium DNS installer](../dns-server/) for internal DNS resolution.
+Use with the [DNS configuration script](../dns-server/) for internal name resolution.
 
 ---
 *Van Auken Tech · Thomas Van Auken*
