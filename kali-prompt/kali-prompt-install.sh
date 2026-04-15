@@ -2,7 +2,7 @@
 # ============================================================================
 #  Kali-Style Prompt Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    1.0.0
+#  Version:    1.0.1
 #  Date:       2026-04-15
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -17,7 +17,7 @@ set -o pipefail
 
 # ── Script Metadata ───────────────────────────────────────────────────────────
 SCRIPT_NAME="kali-prompt-install"
-SCRIPT_VERSION="1.0.0"
+SCRIPT_VERSION="1.0.1"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 LOG_DIR="${LOG_DIR:-/var/tmp/${SCRIPT_NAME}}"
 LOG_FILE="${LOG_DIR}/${SCRIPT_NAME}-${TIMESTAMP}.log"
@@ -65,9 +65,21 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fatal "Required command not found: $1"
 }
 
+# Helper to get hostname with fallback for minimal containers
+get_hostname() {
+  if command -v hostname >/dev/null 2>&1; then
+    hostname -f 2>/dev/null || hostname 2>/dev/null || cat /etc/hostname 2>/dev/null || echo "unknown"
+  elif [[ -r /etc/hostname ]]; then
+    cat /etc/hostname
+  else
+    echo "unknown"
+  fi
+}
+
 # ── Header ────────────────────────────────────────────────────────────────────
 header_info() {
-  clear
+  # Clear screen if available, otherwise just add newlines
+  command -v clear >/dev/null 2>&1 && clear || printf '\n\n\n'
   echo -e "${BL}${BLD}"
   cat << 'BANNER'
   __   ___   _  _   _  _   _ _  _____ _  _   _____ ___ ___ _  _
@@ -77,7 +89,7 @@ header_info() {
 BANNER
   echo -e "${CL}"
   echo -e "${DGN}  ── Kali-Style Prompt Installer ────────────────────────────────────${CL}"
-  printf "  ${DGN}Host   :${CL}  ${BL}%s${CL}\n" "$(hostname -f 2>/dev/null || hostname)"
+  printf "  ${DGN}Host   :${CL}  ${BL}%s${CL}\n" "$(get_hostname)"
   printf "  ${DGN}Date   :${CL}  ${BL}%s${CL}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
   printf "  ${DGN}Log    :${CL}  ${BL}%s${CL}\n" "$LOG_FILE"
   echo ""
@@ -503,7 +515,7 @@ print_summary() {
   echo ""
   echo -e "${DGN}${BLD}  ────────────────────────────────────────────────────────────────${CL}"
   echo -e "${DGN}  Created by : Thomas Van Auken — Van Auken Tech${CL}"
-  echo -e "${DGN}  Host       : $(hostname -f 2>/dev/null || hostname)${CL}"
+  echo -e "${DGN}  Host       : $(get_hostname)${CL}"
   echo -e "${DGN}  Completed  : $(date '+%Y-%m-%d %H:%M:%S')${CL}"
   echo -e "${DGN}${BLD}  ────────────────────────────────────────────────────────────────${CL}"
   echo ""
