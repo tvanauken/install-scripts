@@ -2,20 +2,24 @@
 # ============================================================================
 #  Kali-Style Prompt Installer for macOS
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    1.0.0
+#  Version:    2.0.0
 #  Date:       2026-04-15
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
 #
-#  Installs a Kali Linux-style command prompt on macOS 12.7.6 (Monterey)
-#  or later. Supports both Intel and Apple Silicon Macs. Auto-detects
-#  the user's shell (zsh/bash) and configures accordingly.
+#  Installs the authentic Kali Linux two-line prompt on macOS 12.7.6
+#  (Monterey) or later. Supports both Intel and Apple Silicon Macs.
+#  Auto-detects the user's shell (zsh/bash) and configures accordingly.
+#
+#  Prompt format:
+#  ┌──(user㉿hostname)-[~/path]
+#  └─$ 
 #
 # ============================================================================
 
 # ── Script Metadata ───────────────────────────────────────────────────────────
 SCRIPT_NAME="kali-prompt-macos-install"
-SCRIPT_VERSION="1.0.0"
+SCRIPT_VERSION="2.0.0"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 LOG_DIR="${LOG_DIR:-${TMPDIR:-/tmp}/${SCRIPT_NAME}}"
 LOG_FILE="${LOG_DIR}/${SCRIPT_NAME}-${TIMESTAMP}.log"
@@ -64,37 +68,24 @@ fatal() {
 }
 
 # ── Version Comparison ────────────────────────────────────────────────────────
-# Compare two version strings (returns 0 if v1 >= v2)
 version_ge() {
   local v1="$1"
   local v2="$2"
   
-  # Use sort -V if available, otherwise do manual comparison
   if printf '%s\n%s' "$v2" "$v1" | sort -V -C 2>/dev/null; then
     return 0
   fi
   
-  # Fallback: manual comparison for major.minor.patch
   local IFS='.'
-  local i
-  local -a ver1
-  local -a ver2
-  
-  # Read into arrays (bash 3.x compatible)
   set -- $v1
   ver1_0="${1:-0}"; ver1_1="${2:-0}"; ver1_2="${3:-0}"
   set -- $v2
   ver2_0="${1:-0}"; ver2_1="${2:-0}"; ver2_2="${3:-0}"
   
-  # Compare major
   if [ "$ver1_0" -gt "$ver2_0" ] 2>/dev/null; then return 0; fi
   if [ "$ver1_0" -lt "$ver2_0" ] 2>/dev/null; then return 1; fi
-  
-  # Compare minor
   if [ "$ver1_1" -gt "$ver2_1" ] 2>/dev/null; then return 0; fi
   if [ "$ver1_1" -lt "$ver2_1" ] 2>/dev/null; then return 1; fi
-  
-  # Compare patch
   if [ "$ver1_2" -ge "$ver2_2" ] 2>/dev/null; then return 0; fi
   
   return 1
@@ -154,33 +145,8 @@ replace_managed_block() {
   backup_file "$file"
 
   if grep -Fq "$start_marker" "$file" 2>/dev/null; then
-    # Remove existing block using sed (macOS compatible)
     sed -i '' "/$start_marker/,/$end_marker/d" "$file" 2>/dev/null || true
   fi
-
-  # Append new block
-  printf '\n%s\n' "$start_marker" >> "$file"
-  printf '%s\n' "$content" >> "$file"
-  printf '%s\n' "$end_marker" >> "$file"
-
-  ensure_ownership "$file"
-}
-
-append_block_once() {
-  local file="$1"
-  local start_marker="$2"
-  local end_marker="$3"
-  local content="$4"
-
-  mkdir -p "$(dirname "$file")" 2>/dev/null || true
-  touch "$file" 2>/dev/null || true
-
-  if grep -Fq "$start_marker" "$file" 2>/dev/null; then
-    msg_ok "Managed block already present in $file"
-    return 0
-  fi
-
-  backup_file "$file"
 
   printf '\n%s\n' "$start_marker" >> "$file"
   printf '%s\n' "$content" >> "$file"
@@ -199,10 +165,8 @@ detect_real_user() {
     REAL_USER="$(id -un)"
   fi
 
-  # macOS home directories are in /Users
   REAL_HOME="/Users/$REAL_USER"
   
-  # Handle root user
   if [ "$REAL_USER" = "root" ]; then
     REAL_HOME="/var/root"
   fi
@@ -219,38 +183,27 @@ detect_real_user() {
 detect_macos() {
   section "Detecting macOS Version"
 
-  # Check if running on macOS
   if [ "$(uname)" != "Darwin" ]; then
     fatal "This script is for macOS only. Detected: $(uname)"
   fi
 
-  # Get macOS version
   MACOS_VERSION="$(sw_vers -productVersion 2>/dev/null)"
   if [ -z "$MACOS_VERSION" ]; then
     fatal "Unable to determine macOS version"
   fi
 
-  # Get macOS name
   MACOS_NAME="$(sw_vers -productName 2>/dev/null) $MACOS_VERSION"
 
-  # Check minimum version
   if ! version_ge "$MACOS_VERSION" "$MIN_MACOS_VERSION"; then
     fatal "macOS $MIN_MACOS_VERSION or later required. Found: $MACOS_VERSION"
   fi
 
-  # Detect architecture
   local arch
   arch="$(uname -m)"
   case "$arch" in
-    arm64)
-      ARCH_TYPE="Apple Silicon"
-      ;;
-    x86_64)
-      ARCH_TYPE="Intel"
-      ;;
-    *)
-      ARCH_TYPE="$arch"
-      ;;
+    arm64) ARCH_TYPE="Apple Silicon" ;;
+    x86_64) ARCH_TYPE="Intel" ;;
+    *) ARCH_TYPE="$arch" ;;
   esac
 
   msg_ok "Detected: $MACOS_NAME"
@@ -284,26 +237,52 @@ detect_shell() {
   echo "Shell: $TARGET_SHELL_NAME" >> "$LOG_FILE"
 }
 
-# ── Prompt Configuration Blocks ──────────────────────────────────────────────
+# ── Prompt Configuration Blocks (Authentic Kali Two-Line Prompt) ─────────────
 build_bash_block() {
-  cat <<'EOF'
-# Kali-like prompt — managed by kali-prompt-macos-install
-# macOS-compatible prompt configuration
+  cat <<'BASHEOF'
+# Kali Linux two-line prompt — managed by kali-prompt-macos-install
+# Authentic Kali prompt format:
+#   ┌──(user㉿hostname)-[~/path]
+#   └─$ 
 
-__kali_prompt_apply() {
-    local reset='\[\033[0m\]'
-    local red='\[\033[1;31m\]'
-    local blue='\[\033[1;34m\]'
-
+__kali_prompt_command() {
+    local EXIT="$?"
+    local RESET='\[\033[0m\]'
+    local BOLD='\[\033[1m\]'
+    local RED='\[\033[1;31m\]'
+    local GREEN='\[\033[1;32m\]'
+    local BLUE='\[\033[1;34m\]'
+    
+    # Box drawing characters
+    local TOP_LEFT='┌'
+    local TOP_LINE='──'
+    local BOTTOM_LEFT='└'
+    local BOTTOM_LINE='─'
+    local LPAREN='('
+    local RPAREN=')'
+    local LBRACKET='['
+    local RBRACKET=']'
+    local SEPARATOR='㉿'
+    
+    local user_host="\u${SEPARATOR}\h"
+    local workdir="\w"
+    
     if [ "$(id -u)" -eq 0 ]; then
-        PS1="${red}\u@\h${reset}:${blue}\w${reset}# "
+        # Root prompt (red)
+        local COLOR="$RED"
+        local PROMPT_CHAR='#'
     else
-        PS1="${red}\u@\h${reset}:${blue}\w${reset}\$ "
+        # Regular user prompt (green)
+        local COLOR="$GREEN"
+        local PROMPT_CHAR='$'
     fi
+    
+    # Build two-line prompt
+    PS1="${COLOR}${TOP_LEFT}${TOP_LINE}${LPAREN}${BOLD}${user_host}${RESET}${COLOR}${RPAREN}-${LBRACKET}${BOLD}${BLUE}${workdir}${RESET}${COLOR}${RBRACKET}${RESET}\n"
+    PS1+="${COLOR}${BOTTOM_LEFT}${BOTTOM_LINE}${RESET}${PROMPT_CHAR} "
 }
 
-__kali_prompt_apply
-unset -f __kali_prompt_apply
+PROMPT_COMMAND='__kali_prompt_command'
 
 # macOS-compatible aliases (BSD ls uses -G for color)
 alias ls='ls -G'
@@ -313,24 +292,66 @@ alias l='ls -CFG'
 alias grep='grep --color=auto'
 alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
+alias ip='ifconfig'
 
 # Enable color output
 export CLICOLOR=1
 export LSCOLORS=ExFxBxDxCxegedabagacad
-EOF
+BASHEOF
 }
 
 build_zsh_block() {
-  cat <<'EOF'
-# Kali-like prompt — managed by kali-prompt-macos-install
-# macOS zsh prompt configuration
+  cat <<'ZSHEOF'
+# Kali Linux two-line prompt — managed by kali-prompt-macos-install
+# Authentic Kali prompt format:
+#   ┌──(user㉿hostname)-[~/path]
+#   └─$ 
 
 autoload -U colors 2>/dev/null && colors
 
-if [[ $EUID -eq 0 ]]; then
-    PROMPT='%F{red}%n@%m%f:%F{blue}%~%f# '
-else
-    PROMPT='%F{red}%n@%m%f:%F{blue}%~%f%# '
+# Function to build Kali-style prompt
+__kali_prompt() {
+    local RESET='%f%b'
+    local BOLD='%B'
+    local RED='%F{red}'
+    local GREEN='%F{green}'
+    local BLUE='%F{blue}'
+    
+    # Box drawing characters
+    local TOP_LEFT='┌'
+    local TOP_LINE='──'
+    local BOTTOM_LEFT='└'
+    local BOTTOM_LINE='─'
+    
+    local user_host="%n㉿%m"
+    local workdir="%~"
+    
+    if [[ $EUID -eq 0 ]]; then
+        # Root prompt (red)
+        local COLOR="$RED"
+        local PROMPT_CHAR='#'
+    else
+        # Regular user prompt (green)
+        local COLOR="$GREEN"
+        local PROMPT_CHAR='$'
+    fi
+    
+    # Build two-line prompt
+    echo "${COLOR}${TOP_LEFT}${TOP_LINE}(${BOLD}${user_host}${RESET}${COLOR})-[${BOLD}${BLUE}${workdir}${RESET}${COLOR}]${RESET}"
+    echo "${COLOR}${BOTTOM_LEFT}${BOTTOM_LINE}${RESET}${PROMPT_CHAR} "
+}
+
+# Set the prompt
+setopt PROMPT_SUBST
+PROMPT=$'$(__kali_prompt)'
+
+# Simpler fallback if function doesn't work
+if [[ -z "$PROMPT" ]] || [[ "$PROMPT" == "$'\$(__kali_prompt)'" ]]; then
+    if [[ $EUID -eq 0 ]]; then
+        PROMPT=$'%F{red}┌──(%B%n㉿%m%b%F{red})-[%B%F{blue}%~%b%F{red}]%f\n%F{red}└─%f# '
+    else
+        PROMPT=$'%F{green}┌──(%B%n㉿%m%b%F{green})-[%B%F{blue}%~%b%F{green}]%f\n%F{green}└─%f$ '
+    fi
 fi
 
 # macOS-compatible aliases (BSD ls uses -G for color)
@@ -341,11 +362,12 @@ alias l='ls -CFG'
 alias grep='grep --color=auto'
 alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
+alias ip='ifconfig'
 
 # Enable color output
 export CLICOLOR=1
 export LSCOLORS=ExFxBxDxCxegedabagacad
-EOF
+ZSHEOF
 }
 
 # ── Installation Functions ────────────────────────────────────────────────────
@@ -362,7 +384,6 @@ install_bash_prompt() {
   replace_managed_block "$file" "$start" "$end" "$content"
   msg_ok "Bash prompt configured: $file"
   
-  # Also add to .bashrc for non-login shells
   local bashrc="${REAL_HOME}/.bashrc"
   if [ -f "$bashrc" ] || [ "$TARGET_SHELL_NAME" = "bash" ]; then
     msg_info "Configuring $bashrc"
@@ -395,7 +416,6 @@ verify_installation() {
   local ok_count=0
   local fail_count=0
 
-  # Check zsh config (primary on macOS)
   printf "${TAB}  %-50s" ".zshrc configuration"
   if grep -Fq "kali-prompt-macos-install" "${REAL_HOME}/.zshrc" 2>/dev/null; then
     printf "${GN}✔ Verified${CL}\n"
@@ -405,7 +425,6 @@ verify_installation() {
     fail_count=$((fail_count + 1))
   fi
 
-  # Check bash config
   printf "${TAB}  %-50s" ".bash_profile configuration"
   if grep -Fq "kali-prompt-macos-install" "${REAL_HOME}/.bash_profile" 2>/dev/null; then
     printf "${GN}✔ Verified${CL}\n"
@@ -423,7 +442,6 @@ verify_installation() {
     install_bash_prompt
   fi
 
-  # Final check
   if ! grep -Fq "kali-prompt-macos-install" "${REAL_HOME}/.zshrc" 2>/dev/null; then
     fatal "Verification failed after repair attempt"
   fi
@@ -444,6 +462,10 @@ print_summary() {
   printf "  ${GN}${BLD}macOS Version     :${CL}  %s\n" "${MACOS_NAME}"
   printf "  ${GN}${BLD}Architecture      :${CL}  %s\n" "${ARCH_TYPE}"
   printf "  ${GN}${BLD}Shell Configured  :${CL}  %s\n" "${TARGET_SHELL_NAME}"
+  echo ""
+  printf "  ${GN}${BLD}Prompt format (two-line Kali style):${CL}\n"
+  printf "  ${GN}    ┌──(user㉿hostname)-[~/path]${CL}\n"
+  printf "  ${GN}    └─\$ ${CL}\n"
   echo ""
   printf "  ${GN}${BLD}Configured files:${CL}\n"
   printf "  ${GN}    ✔${CL}  ${REAL_HOME}/.zshrc\n"
@@ -467,7 +489,6 @@ print_summary() {
 preflight() {
   section "Preflight Checks"
 
-  # Check we're on macOS
   printf "${TAB}  %-40s" "macOS platform"
   if [ "$(uname)" = "Darwin" ]; then
     printf "${GN}✔ Darwin${CL}\n"
@@ -476,7 +497,6 @@ preflight() {
     fatal "This script requires macOS"
   fi
 
-  # Required commands (all should be present on macOS)
   local required_cmds="bash grep sed id cp"
   for cmd in $required_cmds; do
     printf "${TAB}  %-40s" "$cmd"
@@ -488,7 +508,6 @@ preflight() {
     fi
   done
 
-  # Check sw_vers
   printf "${TAB}  %-40s" "sw_vers"
   if command -v sw_vers >/dev/null 2>&1; then
     printf "${GN}✔ Found${CL}\n"
@@ -497,7 +516,6 @@ preflight() {
     fatal "sw_vers not found - cannot determine macOS version"
   fi
 
-  # Check dscl for user info
   printf "${TAB}  %-40s" "dscl"
   if command -v dscl >/dev/null 2>&1; then
     printf "${GN}✔ Found${CL}\n"
@@ -517,8 +535,6 @@ main() {
   detect_macos
   detect_shell
   
-  # Always install both zsh and bash configs on macOS
-  # since users may switch shells
   install_zsh_prompt
   install_bash_prompt
   
