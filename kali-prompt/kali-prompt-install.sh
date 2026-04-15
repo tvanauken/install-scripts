@@ -2,14 +2,18 @@
 # ============================================================================
 #  Kali-Style Prompt Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    1.0.1
+#  Version:    2.0.0
 #  Date:       2026-04-15
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
 #
-#  Installs a Kali Linux-style command prompt on Ubuntu, Debian, RHEL,
-#  Rocky Linux, or Fedora. Auto-detects the user's shell (bash/zsh) and
-#  configures accordingly.
+#  Installs the authentic Kali Linux two-line prompt on Ubuntu, Debian,
+#  RHEL, Rocky Linux, or Fedora. Auto-detects the user's shell (bash/zsh)
+#  and configures accordingly.
+#
+#  Prompt format:
+#  ┌──(user㉿hostname)-[~/path]
+#  └─$ 
 #
 # ============================================================================
 
@@ -17,7 +21,7 @@ set -o pipefail
 
 # ── Script Metadata ───────────────────────────────────────────────────────────
 SCRIPT_NAME="kali-prompt-install"
-SCRIPT_VERSION="1.0.1"
+SCRIPT_VERSION="2.0.0"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 LOG_DIR="${LOG_DIR:-/var/tmp/${SCRIPT_NAME}}"
 LOG_FILE="${LOG_DIR}/${SCRIPT_NAME}-${TIMESTAMP}.log"
@@ -65,7 +69,6 @@ require_command() {
   command -v "$1" >/dev/null 2>&1 || fatal "Required command not found: $1"
 }
 
-# Helper to get hostname with fallback for minimal containers
 get_hostname() {
   if command -v hostname >/dev/null 2>&1; then
     hostname -f 2>/dev/null || hostname 2>/dev/null || cat /etc/hostname 2>/dev/null || echo "unknown"
@@ -78,7 +81,6 @@ get_hostname() {
 
 # ── Header ────────────────────────────────────────────────────────────────────
 header_info() {
-  # Clear screen if available, otherwise just add newlines
   command -v clear >/dev/null 2>&1 && clear || printf '\n\n\n'
   echo -e "${BL}${BLD}"
   cat << 'BANNER'
@@ -206,7 +208,6 @@ detect_os() {
   section "Detecting Operating System"
 
   [[ -r /etc/os-release ]] || fatal "/etc/os-release not found; unsupported system"
-  # shellcheck disable=SC1091
   . /etc/os-release
 
   OS_ID="${ID:-unknown}"
@@ -319,30 +320,54 @@ install_optional_shell_tools() {
   msg_ok "Optional packages installed: ${packages[*]}"
 }
 
-# ── Prompt Configuration Blocks ──────────────────────────────────────────────
+# ── Prompt Configuration Blocks (Authentic Kali Two-Line Prompt) ─────────────
 build_bash_block() {
-  cat <<'EOF'
-# Kali-like prompt — managed by kali-prompt-install
-case "$TERM" in
-    xterm*|rxvt*|screen*|tmux*|linux*|vt*) color_prompt=yes ;;
-    *) color_prompt=yes ;;
-esac
+  cat <<'BASHEOF'
+# Kali Linux two-line prompt — managed by kali-prompt-install
+# Authentic Kali prompt format:
+#   ┌──(user㉿hostname)-[~/path]
+#   └─$ 
 
-__kali_prompt_apply() {
-    local reset='\[\033[0m\]'
-    local red='\[\033[1;31m\]'
-    local blue='\[\033[1;34m\]'
-
+__kali_prompt_command() {
+    local EXIT="$?"
+    local RESET='\[\033[0m\]'
+    local BOLD='\[\033[1m\]'
+    local RED='\[\033[1;31m\]'
+    local GREEN='\[\033[1;32m\]'
+    local BLUE='\[\033[1;34m\]'
+    
+    # Box drawing characters
+    local TOP_LEFT='┌'
+    local TOP_LINE='──'
+    local BOTTOM_LEFT='└'
+    local BOTTOM_LINE='─'
+    local LPAREN='('
+    local RPAREN=')'
+    local LBRACKET='['
+    local RBRACKET=']'
+    local SEPARATOR='㉿'
+    
+    local user_host="\u${SEPARATOR}\h"
+    local workdir="\w"
+    
     if [ "$(id -u)" -eq 0 ]; then
-        PS1="${red}\u@\h${reset}:${blue}\w${reset}# "
+        # Root prompt (red)
+        local COLOR="$RED"
+        local PROMPT_CHAR='#'
     else
-        PS1="${red}\u@\h${reset}:${blue}\w${reset}\$ "
+        # Regular user prompt (green)
+        local COLOR="$GREEN"
+        local PROMPT_CHAR='$'
     fi
+    
+    # Build two-line prompt
+    PS1="${COLOR}${TOP_LEFT}${TOP_LINE}${LPAREN}${BOLD}${user_host}${RESET}${COLOR}${RPAREN}-${LBRACKET}${BOLD}${BLUE}${workdir}${RESET}${COLOR}${RBRACKET}${RESET}\n"
+    PS1+="${COLOR}${BOTTOM_LEFT}${BOTTOM_LINE}${RESET}${PROMPT_CHAR} "
 }
 
-__kali_prompt_apply
-unset -f __kali_prompt_apply
+PROMPT_COMMAND='__kali_prompt_command'
 
+# Color aliases
 alias ls='ls --color=auto 2>/dev/null || ls -G 2>/dev/null || ls'
 alias ll='ls -alF --color=auto 2>/dev/null || ls -alFG 2>/dev/null || ls -alF'
 alias la='ls -A --color=auto 2>/dev/null || ls -AG 2>/dev/null || ls -A'
@@ -350,20 +375,66 @@ alias l='ls -CF --color=auto 2>/dev/null || ls -CFG 2>/dev/null || ls -CF'
 alias grep='grep --color=auto'
 alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
-EOF
+alias diff='diff --color=auto'
+alias ip='ip -color=auto'
+BASHEOF
 }
 
 build_zsh_block() {
-  cat <<'EOF'
-# Kali-like prompt — managed by kali-prompt-install
+  cat <<'ZSHEOF'
+# Kali Linux two-line prompt — managed by kali-prompt-install
+# Authentic Kali prompt format:
+#   ┌──(user㉿hostname)-[~/path]
+#   └─$ 
+
 autoload -U colors >/dev/null 2>&1 && colors
 
-if [[ $EUID -eq 0 ]]; then
-    PROMPT='%F{red}%n@%m%f:%F{blue}%~%f# '
-else
-    PROMPT='%F{red}%n@%m%f:%F{blue}%~%f$ '
+# Function to build Kali-style prompt
+__kali_prompt() {
+    local RESET='%f%b'
+    local BOLD='%B'
+    local RED='%F{red}'
+    local GREEN='%F{green}'
+    local BLUE='%F{blue}'
+    
+    # Box drawing characters
+    local TOP_LEFT='┌'
+    local TOP_LINE='──'
+    local BOTTOM_LEFT='└'
+    local BOTTOM_LINE='─'
+    
+    local user_host="%n㉿%m"
+    local workdir="%~"
+    
+    if [[ $EUID -eq 0 ]]; then
+        # Root prompt (red)
+        local COLOR="$RED"
+        local PROMPT_CHAR='#'
+    else
+        # Regular user prompt (green)
+        local COLOR="$GREEN"
+        local PROMPT_CHAR='$'
+    fi
+    
+    # Build two-line prompt
+    echo "${COLOR}${TOP_LEFT}${TOP_LINE}(${BOLD}${user_host}${RESET}${COLOR})-[${BOLD}${BLUE}${workdir}${RESET}${COLOR}]${RESET}"
+    echo "${COLOR}${BOTTOM_LEFT}${BOTTOM_LINE}${RESET}${PROMPT_CHAR} "
+}
+
+# Set the prompt
+setopt PROMPT_SUBST
+PROMPT=$'$(__kali_prompt)'
+
+# Simpler fallback if function doesn't work
+if [[ -z "$PROMPT" ]] || [[ "$PROMPT" == "$'\$(__kali_prompt)'" ]]; then
+    if [[ $EUID -eq 0 ]]; then
+        PROMPT=$'%F{red}┌──(%B%n㉿%m%b%F{red})-[%B%F{blue}%~%b%F{red}]%f\n%F{red}└─%f# '
+    else
+        PROMPT=$'%F{green}┌──(%B%n㉿%m%b%F{green})-[%B%F{blue}%~%b%F{green}]%f\n%F{green}└─%f$ '
+    fi
 fi
 
+# Color aliases
 alias ls='ls --color=auto 2>/dev/null || ls -G 2>/dev/null || ls'
 alias ll='ls -alF --color=auto 2>/dev/null || ls -alFG 2>/dev/null || ls -alF'
 alias la='ls -A --color=auto 2>/dev/null || ls -AG 2>/dev/null || ls -A'
@@ -371,7 +442,9 @@ alias l='ls -CF --color=auto 2>/dev/null || ls -CFG 2>/dev/null || ls -CF'
 alias grep='grep --color=auto'
 alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
-EOF
+alias diff='diff --color=auto'
+alias ip='ip -color=auto'
+ZSHEOF
 }
 
 # ── Installation Functions ────────────────────────────────────────────────────
@@ -438,7 +511,6 @@ verify_installation() {
   local ok_count=0
   local fail_count=0
 
-  # Check bash config
   printf "${TAB}  %-50s" ".bashrc configuration"
   if grep -Fq "kali-prompt-install" "${REAL_HOME}/.bashrc" 2>/dev/null; then
     printf "${GN}✔ Verified${CL}\n"
@@ -448,7 +520,6 @@ verify_installation() {
     fail_count=$((fail_count + 1))
   fi
 
-  # Check zsh config (only if zsh is target shell)
   if [[ "$TARGET_SHELL_NAME" == "zsh" ]]; then
     printf "${TAB}  %-50s" ".zshrc configuration"
     if grep -Fq "kali-prompt-install" "${REAL_HOME}/.zshrc" 2>/dev/null; then
@@ -460,7 +531,6 @@ verify_installation() {
     fi
   fi
 
-  # Check profile loader
   printf "${TAB}  %-50s" ".profile loader"
   if grep -Fq "kali-prompt-loader" "${REAL_HOME}/.profile" 2>/dev/null; then
     printf "${GN}✔ Verified${CL}\n"
@@ -480,7 +550,6 @@ verify_installation() {
     fi
   fi
 
-  # Final check
   if ! grep -Fq "kali-prompt-install" "${REAL_HOME}/.bashrc" 2>/dev/null; then
     fatal "Verification failed after repair attempt"
   fi
@@ -501,6 +570,10 @@ print_summary() {
   printf "  ${GN}${BLD}Detected OS       :${CL}  %s\n" "${OS_PRETTY}"
   printf "  ${GN}${BLD}OS Family         :${CL}  %s\n" "${OS_FAMILY}"
   printf "  ${GN}${BLD}Shell Configured  :${CL}  %s\n" "${TARGET_SHELL_NAME}"
+  echo ""
+  echo -e "  ${GN}${BLD}Prompt format (two-line Kali style):${CL}"
+  echo -e "  ${GN}    ┌──(user㉿hostname)-[~/path]${CL}"
+  echo -e "  ${GN}    └─\$ ${CL}"
   echo ""
   echo -e "  ${GN}${BLD}Configured files:${CL}"
   echo -e "  ${GN}    ✔${CL}  ${REAL_HOME}/.bashrc"
@@ -525,7 +598,6 @@ print_summary() {
 preflight() {
   section "Preflight Checks"
 
-  # Required commands
   local required_cmds=(bash grep awk sed id cp tee)
   for cmd in "${required_cmds[@]}"; do
     printf "${TAB}  %-40s" "$cmd"
@@ -537,7 +609,6 @@ preflight() {
     fi
   done
 
-  # Optional: getent (not always available on minimal installs)
   printf "${TAB}  %-40s" "getent"
   if command -v getent >/dev/null 2>&1; then
     printf "${GN}✔ Found${CL}\n"
