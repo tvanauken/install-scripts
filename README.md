@@ -116,7 +116,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 ---
 
-### 7. Kali-Style Prompt Installer
+### 7. Kali-Style Prompt Installer (Linux)
 **Directory:** [`kali-prompt/`](kali-prompt/)
 **Script:** [`kali-prompt-install.sh`](kali-prompt/kali-prompt-install.sh)
 
@@ -134,6 +134,29 @@ Installs the iconic **Kali Linux-style command prompt** — bold red username@ho
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt/kali-prompt-install.sh)
+```
+
+---
+
+### 8. Kali-Style Prompt Installer (macOS)
+**Directory:** [`kali-prompt-macos/`](kali-prompt-macos/)
+**Script:** [`kali-prompt-macos-install.sh`](kali-prompt-macos/kali-prompt-macos-install.sh)
+
+> 🍎 **macOS 12.7.6 (Monterey) or later** — supports both Intel and Apple Silicon Macs.
+> Auto-detects user shell (zsh/bash) and configures accordingly.
+
+Installs the iconic **Kali Linux-style command prompt** on macOS — bold red username@hostname with blue working directory. Specifically adapted for macOS with BSD `ls -G` colors and `CLICOLOR`/`LSCOLORS` environment variables.
+
+**Features:**
+- Supports macOS 12.7.6+ (Monterey, Ventura, Sonoma, Sequoia)
+- Intel (x86_64) and Apple Silicon (arm64) support
+- Configures both zsh (macOS default) and bash
+- Uses BSD color flags (-G) for ls
+- Idempotent — safe to run multiple times
+- Creates timestamped backups
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt-macos/kali-prompt-macos-install.sh)
 ```
 
 ---
@@ -157,6 +180,7 @@ All scripts share the same Van Auken Tech visual identity:
 - Script 4: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
 - Scripts 5–6: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
 - Script 7: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
+- Script 8: macOS 12.7.6+ (Monterey or later) · Intel or Apple Silicon · User-level access
 - All scripts require internet connectivity. Missing dependencies are auto-installed.
 
 ---
