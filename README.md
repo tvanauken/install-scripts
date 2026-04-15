@@ -116,6 +116,28 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 ---
 
+### 7. Kali-Style Prompt Installer
+**Directory:** [`kali-prompt/`](kali-prompt/)
+**Script:** [`kali-prompt-install.sh`](kali-prompt/kali-prompt-install.sh)
+
+> **Universal Linux Support** — works on Ubuntu, Debian, RHEL, Rocky, Fedora, and derivatives.
+> Auto-detects user shell (bash/zsh) and configures accordingly.
+
+Installs the iconic **Kali Linux-style command prompt** — bold red username@hostname with blue working directory. Creates backups of all modified files and includes comprehensive logging.
+
+**Features:**
+- Multi-distribution support (Debian/RHEL families)
+- Auto-detects and configures bash and/or zsh
+- Idempotent — safe to run multiple times
+- Creates timestamped backups
+- Includes color-enabled aliases (ls, grep, etc.)
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt/kali-prompt-install.sh)
+```
+
+---
+
 ## Visual Standard
 
 All scripts share the same Van Auken Tech visual identity:
@@ -134,6 +156,7 @@ All scripts share the same Van Auken Tech visual identity:
 - Scripts 1–3: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
 - Script 4: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
 - Scripts 5–6: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
+- Script 7: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
 - All scripts require internet connectivity. Missing dependencies are auto-installed.
 
 ---
