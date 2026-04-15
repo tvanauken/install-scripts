@@ -8,7 +8,7 @@
 
 A collection of custom scripts for Van Auken Tech infrastructure, all adhering to the **Van Auken Tech standard** for script design and visual presentation. Every script in this collection shares a unified look, feel, and behaviour.
 
-Scripts 1–3 target Proxmox VE hosts directly. Script 4 targets Raspberry Pi hardware. Scripts 5–6 configure already-deployed LXC containers — install the LXC first from community-scripts.org, then run the script.
+Scripts 1–3 target Proxmox VE hosts directly. Script 4 targets Raspberry Pi hardware. Scripts 5–6 configure already-deployed LXC containers — install the LXC first from community-scripts.org, then run the script. Script 7 works on any Linux distribution.
 
 ---
 
@@ -22,6 +22,7 @@ Scripts 1–3 target Proxmox VE hosts directly. Script 4 targets Raspberry Pi ha
 | 4 | **Raspberry Pi Setup** | [`pi-setup/`](../pi-setup/) | **Raspberry Pi** | 1.0.0 | Kali tools + XFCE desktop + performance tuning |
 | 5 | Technitium DNS Server | [`dns-server/`](../dns-server/) | Debian/Ubuntu | **3.0.0** | UniFi survey, root hints, dynamic zones, auto-sync |
 | 6 | Nginx Proxy Manager | [`npm-reverse-proxy/`](../npm-reverse-proxy/) | Debian/Ubuntu | **3.0.0** | Native install, Lua SRV resolver, dynamic SSL proxy |
+| 7 | Kali-Style Prompt Installer | [`kali-prompt/`](../kali-prompt/) | Any Linux | 1.0.0 | Installs Kali Linux-style prompt on any distro |
 
 > ⚠ Script 4 requires **Raspberry Pi hardware** (armhf/arm64). Supported OS: Raspberry Pi OS, Ubuntu Desktop/Server, Kali Linux ARM, Debian ARM.
 > NOT compatible with Proxmox VE or x86/x86_64 systems.
@@ -114,8 +115,12 @@ install-scripts/
 │   ├── dns-server-install.sh
 │   ├── README.md
 │   └── docs/
-└── npm-reverse-proxy/
-    ├── npm-reverse-proxy-install.sh
+├── npm-reverse-proxy/
+│   ├── npm-reverse-proxy-install.sh
+│   ├── README.md
+│   └── docs/
+└── kali-prompt/
+    ├── kali-prompt-install.sh
     ├── README.md
     └── docs/
 ```
@@ -162,6 +167,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 ### Configure Nginx Proxy Manager (post-install only)
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/npm-reverse-proxy/npm-reverse-proxy-install.sh)
+```
+
+### Install Kali-Style Prompt (Any Linux Distro)
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt/kali-prompt-install.sh)
 ```
 
 > **Note:** The pi-setup one-liner requires `sudo bash <(...)` — not bare curl.
