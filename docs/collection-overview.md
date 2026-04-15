@@ -8,7 +8,7 @@
 
 A collection of custom scripts for Van Auken Tech infrastructure, all adhering to the **Van Auken Tech standard** for script design and visual presentation. Every script in this collection shares a unified look, feel, and behaviour.
 
-Scripts 1–3 target Proxmox VE hosts directly. Script 4 targets Raspberry Pi hardware. Scripts 5–6 configure already-deployed LXC containers — install the LXC first from community-scripts.org, then run the script. Script 7 works on any Linux distribution.
+Scripts 1–3 target Proxmox VE hosts directly. Script 4 targets Raspberry Pi hardware. Scripts 5–6 configure already-deployed LXC containers — install the LXC first from community-scripts.org, then run the script. Scripts 7–8 are cross-platform prompt installers.
 
 ---
 
@@ -22,13 +22,16 @@ Scripts 1–3 target Proxmox VE hosts directly. Script 4 targets Raspberry Pi ha
 | 4 | **Raspberry Pi Setup** | [`pi-setup/`](../pi-setup/) | **Raspberry Pi** | 1.0.0 | Kali tools + XFCE desktop + performance tuning |
 | 5 | Technitium DNS Server | [`dns-server/`](../dns-server/) | Debian/Ubuntu | **3.0.0** | UniFi survey, root hints, dynamic zones, auto-sync |
 | 6 | Nginx Proxy Manager | [`npm-reverse-proxy/`](../npm-reverse-proxy/) | Debian/Ubuntu | **3.0.0** | Native install, Lua SRV resolver, dynamic SSL proxy |
-| 7 | Kali-Style Prompt Installer | [`kali-prompt/`](../kali-prompt/) | Any Linux | 1.0.0 | Installs Kali Linux-style prompt on any distro |
+| 7 | Kali-Style Prompt (Linux) | [`kali-prompt/`](../kali-prompt/) | Any Linux | 1.0.1 | Installs Kali Linux-style prompt on any distro |
+| 8 | **Kali-Style Prompt (macOS)** | [`kali-prompt-macos/`](../kali-prompt-macos/) | **macOS 12.7.6+** | 1.0.0 | Installs Kali-style prompt on Intel/Apple Silicon Macs |
 
 > ⚠ Script 4 requires **Raspberry Pi hardware** (armhf/arm64). Supported OS: Raspberry Pi OS, Ubuntu Desktop/Server, Kali Linux ARM, Debian ARM.
 > NOT compatible with Proxmox VE or x86/x86_64 systems.
 > Must be run with `sudo bash <(curl -s URL)` — not curl alone.
 
 > ℹ Scripts 5–6 now include **full installation scripts** that install and configure from scratch. Also available are post-install scripts for existing installations.
+
+> 🍎 Script 8 requires **macOS 12.7.6 (Monterey)** or later. Supports both Intel and Apple Silicon Macs.
 
 > 📖 See the [DNS & NPM Infrastructure Manual](dns-npm-infrastructure-manual.md) for complete documentation on deploying the DNS + reverse proxy pair.
 
@@ -60,12 +63,12 @@ Every script must conform to the following:
 
 | Requirement | Specification |
 |-------------|---------------|
-| Shebang | `#!/usr/bin/env bash` |
+| Shebang | `#!/usr/bin/env bash` or `#!/bin/bash` |
 | Shell | bash only |
 | Error handling | `set -o pipefail` minimum; graceful per-step failures |
 | Cleanup trap | `trap cleanup EXIT` — resets terminal cursor |
-| Root check | Every script checks `$EUID -ne 0` |
-| Dependency install | Missing tools auto-installed via `apt-get` |
+| Root check | Every script checks `$EUID -ne 0` (where applicable) |
+| Dependency install | Missing tools auto-installed via package manager |
 | Log file | Every script writes a timestamped log |
 | Non-interactive apt | Always `DEBIAN_FRONTEND=noninteractive apt-get install -y` |
 | No snap | snapd is never used; blocked at apt layer where applicable |
@@ -119,8 +122,12 @@ install-scripts/
 │   ├── npm-reverse-proxy-install.sh
 │   ├── README.md
 │   └── docs/
-└── kali-prompt/
-    ├── kali-prompt-install.sh
+├── kali-prompt/
+│   ├── kali-prompt-install.sh
+│   ├── README.md
+│   └── docs/
+└── kali-prompt-macos/     🍎 macOS 12.7.6+ — Intel/Apple Silicon
+    ├── kali-prompt-macos-install.sh
     ├── README.md
     └── docs/
 ```
@@ -172,6 +179,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 ### Install Kali-Style Prompt (Any Linux Distro)
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt/kali-prompt-install.sh)
+```
+
+### Install Kali-Style Prompt (macOS 12.7.6+)
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt-macos/kali-prompt-macos-install.sh)
 ```
 
 > **Note:** The pi-setup one-liner requires `sudo bash <(...)` — not bare curl.
