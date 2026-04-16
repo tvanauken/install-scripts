@@ -2,7 +2,7 @@
 # ============================================================================
 #  Kali-Style Prompt Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    2.0.1
+#  Version:    2.1.0
 #  Date:       2026-04-15
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -21,7 +21,7 @@ set -o pipefail
 
 # ── Script Metadata ───────────────────────────────────────────────────────────
 SCRIPT_NAME="kali-prompt-install"
-SCRIPT_VERSION="2.0.1"
+SCRIPT_VERSION="2.1.0"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 LOG_DIR="${LOG_DIR:-/var/tmp/${SCRIPT_NAME}}"
 LOG_FILE="${LOG_DIR}/${SCRIPT_NAME}-${TIMESTAMP}.log"
@@ -121,6 +121,32 @@ ensure_ownership() {
   local group
   group="$(id -gn "$REAL_USER" 2>/dev/null || echo "$REAL_USER")"
   chown "$REAL_USER:$group" "$file" 2>/dev/null || true
+}
+
+# Neutralize pre-existing ls aliases outside our managed block
+# This prevents conflicts where earlier alias definitions break argument handling
+neutralize_preexisting_ls_aliases() {
+  local file="$1"
+  local start_marker="$2"
+  local end_marker="$3"
+
+  [[ -f "$file" ]] || return 0
+
+  # Comment out any 'alias ls=' lines that are NOT inside our managed block
+  # Uses awk to track whether we're inside the managed block
+  awk -v start="$start_marker" -v end="$end_marker" '
+    BEGIN { in_block = 0 }
+    $0 == start { in_block = 1; print; next }
+    $0 == end   { in_block = 0; print; next }
+    in_block == 0 && /^[[:space:]]*alias[[:space:]]+ls=/ {
+      print "# [disabled by kali-prompt-install] " $0
+      next
+    }
+    { print }
+  ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+
+  ensure_ownership "$file"
+  echo "Neutralized pre-existing ls aliases in: $file" >> "$LOG_FILE"
 }
 
 replace_managed_block() {
@@ -459,6 +485,11 @@ install_bash_prompt() {
 
   msg_info "Configuring $file"
   replace_managed_block "$file" "$start" "$end" "$content"
+  
+  # Neutralize any pre-existing ls aliases that could conflict
+  msg_info "Checking for conflicting aliases in $file"
+  neutralize_preexisting_ls_aliases "$file" "$start" "$end"
+  
   msg_ok "Bash prompt configured: $file"
   echo "Configured: $file" >> "$LOG_FILE"
 }
@@ -474,6 +505,11 @@ install_zsh_prompt() {
 
   msg_info "Configuring $file"
   replace_managed_block "$file" "$start" "$end" "$content"
+  
+  # Neutralize any pre-existing ls aliases that could conflict
+  msg_info "Checking for conflicting aliases in $file"
+  neutralize_preexisting_ls_aliases "$file" "$start" "$end"
+  
   msg_ok "Zsh prompt configured: $file"
   echo "Configured: $file" >> "$LOG_FILE"
 }

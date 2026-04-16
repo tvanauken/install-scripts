@@ -4,8 +4,22 @@
 
 **Directory:** [`kali-prompt/`](./)
 **Script:** [`kali-prompt-install.sh`](kali-prompt-install.sh)
+**Version:** 2.1.0
 
-Installs a **Kali Linux-style command prompt** on any supported Linux distribution. Auto-detects user shell (bash/zsh) and configures the classic red username/hostname with blue working directory prompt.
+Installs the authentic **Kali Linux two-line prompt** on any supported Linux distribution. Auto-detects user shell (bash/zsh) and configures accordingly.
+
+---
+
+## Prompt Style
+
+```
+┌──(user㉿hostname)-[~/path]
+└─$ 
+```
+
+- **Green** prompt for regular users
+- **Red** prompt for root
+- **Blue** working directory path
 
 ---
 
@@ -24,10 +38,10 @@ Installs a **Kali Linux-style command prompt** on any supported Linux distributi
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt/kali-prompt-install.sh)
 ```
 
-Or with `sudo` if installing for a non-root user while running as root:
+After installation, activate immediately:
 
 ```bash
-sudo -u USERNAME bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt/kali-prompt-install.sh)
+exec bash -l
 ```
 
 ---
@@ -37,31 +51,11 @@ sudo -u USERNAME bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/i
 1. **Detects** target user and home directory (handles `sudo` correctly)
 2. **Identifies** the operating system and package manager
 3. **Detects** the user's login shell (bash or zsh)
-4. **Installs** zsh package if needed and user's shell is zsh
-5. **Configures** `.bashrc` with Kali-style prompt
-6. **Configures** `.zshrc` if user's shell is zsh
-7. **Updates** `.profile` with shell config loader
+4. **Configures** `.bashrc` with authentic Kali two-line prompt
+5. **Configures** `.zshrc` if user's shell is zsh
+6. **Neutralizes** any pre-existing `alias ls=` definitions that could conflict
+7. **Creates** timestamped backups of all modified files
 8. **Verifies** all configurations are in place
-9. **Creates** backups of all modified files
-
----
-
-## Prompt Style
-
-**Root user:**
-```
-root@hostname:/path/to/dir#
-```
-
-**Regular user:**
-```
-username@hostname:/path/to/dir$
-```
-
-Colours:
-- **Username@Hostname:** Bold Red
-- **Working Directory:** Bold Blue
-- **Prompt Symbol:** Default (# for root, $ for user)
 
 ---
 

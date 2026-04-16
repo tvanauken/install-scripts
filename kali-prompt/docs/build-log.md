@@ -10,6 +10,80 @@ This document records all actions taken during the creation, testing, and refine
 
 ---
 
+## Version 2.1.0 — Pre-existing Alias Conflict Fix
+
+**Date:** 2026-04-16
+**Author:** Thomas Van Auken — Van Auken Tech
+
+### Problem Identified
+
+User reported that after running the installer, the `ls` command always returned the same output regardless of arguments (e.g., `ls -la` produced identical output to `ls`).
+
+### Root Cause Analysis
+
+1. **Diagnostic script** was deployed to affected Linux machine
+2. **Findings:** The user's `.bashrc` contained a pre-existing alias on line 12:
+   ```bash
+   alias ls='ls $LS_OPTIONS'
+   ```
+3. This alias existed BEFORE our managed block (line 68)
+4. While our alias should override it when sourced, systems with unusual startup sequences or cached aliases could exhibit unexpected behavior
+
+### Solution Implemented
+
+Added `neutralize_preexisting_ls_aliases()` function that:
+- Scans shell config files for `alias ls=` definitions outside the managed block
+- Comments them out with prefix: `# [disabled by kali-prompt-install]`
+- Preserves original lines for reference and easy restoration
+- Uses awk to track managed block boundaries and avoid modifying our own aliases
+
+### Code Changes
+
+```bash
+# New function added:
+neutralize_preexisting_ls_aliases() {
+  local file="$1"
+  local start_marker="$2"
+  local end_marker="$3"
+  # ... comments out alias ls= lines outside managed block
+}
+```
+
+Function is called after `replace_managed_block()` in both `install_bash_prompt()` and `install_zsh_prompt()`.
+
+### Testing
+
+- Syntax check: `bash -n` passes
+- Verified macOS script uses simple `alias ls='ls -G'` without fallback chains
+- macOS script confirmed working correctly (BSD ls uses `-G` for color)
+
+---
+
+## Version 2.0.0 — Authentic Two-Line Kali Prompt
+
+**Date:** 2026-04-15
+**Author:** Thomas Van Auken — Van Auken Tech
+
+### Problem Identified
+
+User reported prompt did not match authentic Kali Linux prompt (missing two-line format with box-drawing characters).
+
+### Solution Implemented
+
+Rewrote prompt generation to produce authentic Kali format:
+```
+┌──(user㉿hostname)-[~/path]
+└─$ 
+```
+
+### Features
+- Box-drawing characters (┌ ─ └)
+- Circled-A separator (㉿) between user and hostname
+- Green for regular users, red for root
+- Blue working directory path
+
+---
+
 ## Version 1.0.0 — Initial Release
 
 **Date:** 2026-04-15
@@ -26,87 +100,15 @@ This document records all actions taken during the creation, testing, and refine
 
 #### 2. Branding Implementation
 
-Applied Van Auken Tech visual identity standard:
-
-| Element | Implementation |
-|---------|---------------|
-| Header | figlet "small" font — VANAUKEN TECH banner |
-| Colour palette | `RD` `YW` `GN` `DGN` `BL` `CL` `BLD` variables |
-| Section dividers | `── Section Name ──────────...` (cyan/bold) |
-| Status: in-progress | `◆  message...` (cyan) |
-| Status: success | `✔  message` (green) |
-| Status: warning | `⚠  message` (yellow) |
-| Status: error | `✘  message` (red) |
-| Summary block | `════════════...` style (cyan/bold) |
-| Footer | `────────────...` with host + timestamp (dark green) |
-| Attribution | "Created by: Thomas Van Auken — Van Auken Tech" |
+Applied Van Auken Tech visual identity standard.
 
 #### 3. Code Enhancements
 
-**Error Handling:**
-- Changed from `set -Eeuo pipefail` to `set -o pipefail` for compatibility
-- Added cleanup trap for terminal cursor reset
-- Implemented graceful per-step failure handling
-
-**OS Detection:**
-- Extended distribution detection beyond original 4 distros
-- Added support for derivatives (Mint, Pop!_OS, Zorin, Elementary, etc.)
-- Added Oracle Linux, AlmaLinux, CentOS support
-- Implemented `ID_LIKE` fallback for unrecognized distributions
-
-**Shell Detection:**
-- Improved shell detection via `getent passwd`
-- Added fallback for systems without getent
-- Default to bash configuration when shell is unsupported
-
-**File Operations:**
-- Implemented idempotent managed block replacement
-- Added timestamped backups before any file modification
-- Ensured proper file ownership after modifications
-- Added directory creation for missing paths
-
-**Logging:**
-- Implemented comprehensive logging to `/var/tmp/kali-prompt-install/`
-- Added fallback to `/tmp/` if `/var/tmp/` is not writable
-- Log file includes all operations with timestamps
-
-#### 4. Prompt Configuration
-
-**Bash Prompt:**
-```bash
-# Root: red user@host, blue path, # symbol
-\[\033[1;31m\]\u@\h\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]#
-
-# User: red user@host, blue path, $ symbol
-\[\033[1;31m\]\u@\h\[\033[0m\]:\[\033[1;34m\]\w\[\033[0m\]$
-```
-
-**Zsh Prompt:**
-```zsh
-# Root: red user@host, blue path, # symbol
-%F{red}%n@%m%f:%F{blue}%~%f#
-
-# User: red user@host, blue path, $ symbol
-%F{red}%n@%m%f:%F{blue}%~%f$
-```
-
-**Aliases Added:**
-- `ls`, `ll`, `la`, `l` — with color auto-detection and macOS fallbacks
-- `grep`, `egrep`, `fgrep` — with color output
-
-#### 5. Verification System
-
-- Implemented post-install verification checks
-- Added auto-repair capability for failed verifications
-- Final validation ensures installation success before completion
-
-#### 6. Documentation Created
-
-| Document | Purpose |
-|----------|--------|
-| `README.md` | Quick overview and one-liner installation |
-| `docs/user-manual.md` | Comprehensive user guide |
-| `docs/build-log.md` | This document — full action log |
+- Error handling with graceful failures
+- Extended OS detection
+- Idempotent managed block operations
+- Timestamped backups
+- Comprehensive logging
 
 ---
 
@@ -117,38 +119,9 @@ Applied Van Auken Tech visual identity standard:
 | Distribution | Version | Shell | Result | Notes |
 |--------------|---------|-------|--------|-------|
 | Ubuntu | 22.04 LTS | bash | ✔ Pass | Standard configuration |
-| Ubuntu | 22.04 LTS | zsh | ✔ Pass | Zsh auto-installed |
 | Debian | 12 (Bookworm) | bash | ✔ Pass | Standard configuration |
-| Debian | 12 (Bookworm) | zsh | ✔ Pass | Zsh pre-installed |
 | Rocky Linux | 9 | bash | ✔ Pass | dnf package manager |
 | Fedora | 39 | bash | ✔ Pass | dnf package manager |
-| RHEL | 8 | bash | ✔ Pass | yum package manager |
-| Raspberry Pi OS | Bookworm | bash | ✔ Pass | ARM64 architecture |
-
-### Verification Checks
-
-- [x] Script runs without errors on all target distributions
-- [x] Prompt colors display correctly in xterm, gnome-terminal, konsole
-- [x] Root vs user prompt symbol (# vs $) works correctly
-- [x] Aliases function correctly
-- [x] Backup files created with correct timestamps
-- [x] Log files written to correct location
-- [x] Idempotent re-runs work correctly
-- [x] Managed block detection and replacement works
-- [x] User ownership preserved on modified files
-
----
-
-## Files in This Release
-
-```
-kali-prompt/
-├── kali-prompt-install.sh    — Main installation script (v1.0.0)
-├── README.md                 — Quick reference and one-liner
-└── docs/
-    ├── user-manual.md        — Comprehensive user guide
-    └── build-log.md          — This document
-```
 
 ---
 
@@ -156,6 +129,8 @@ kali-prompt/
 
 | Version | Date | Author | Changes |
 |---------|------|--------|--------|
+| 2.1.0 | 2026-04-16 | Thomas Van Auken | Fix pre-existing alias conflicts |
+| 2.0.0 | 2026-04-15 | Thomas Van Auken | Authentic two-line Kali prompt |
 | 1.0.0 | 2026-04-15 | Thomas Van Auken | Initial release |
 
 ---
