@@ -2,7 +2,7 @@
 # ============================================================================
 #  Kali-Style Prompt Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    2.0.0
+#  Version:    2.0.1
 #  Date:       2026-04-15
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -21,7 +21,7 @@ set -o pipefail
 
 # ── Script Metadata ───────────────────────────────────────────────────────────
 SCRIPT_NAME="kali-prompt-install"
-SCRIPT_VERSION="2.0.0"
+SCRIPT_VERSION="2.0.1"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 LOG_DIR="${LOG_DIR:-/var/tmp/${SCRIPT_NAME}}"
 LOG_FILE="${LOG_DIR}/${SCRIPT_NAME}-${TIMESTAMP}.log"
@@ -367,11 +367,11 @@ __kali_prompt_command() {
 
 PROMPT_COMMAND='__kali_prompt_command'
 
-# Color aliases
-alias ls='ls --color=auto 2>/dev/null || ls -G 2>/dev/null || ls'
-alias ll='ls -alF --color=auto 2>/dev/null || ls -alFG 2>/dev/null || ls -alF'
-alias la='ls -A --color=auto 2>/dev/null || ls -AG 2>/dev/null || ls -A'
-alias l='ls -CF --color=auto 2>/dev/null || ls -CFG 2>/dev/null || ls -CF'
+# Color aliases (Linux uses --color=auto)
+alias ls='ls --color=auto'
+alias ll='ls -alF --color=auto'
+alias la='ls -A --color=auto'
+alias l='ls -CF --color=auto'
 alias grep='grep --color=auto'
 alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
@@ -434,11 +434,11 @@ if [[ -z "$PROMPT" ]] || [[ "$PROMPT" == "$'\$(__kali_prompt)'" ]]; then
     fi
 fi
 
-# Color aliases
-alias ls='ls --color=auto 2>/dev/null || ls -G 2>/dev/null || ls'
-alias ll='ls -alF --color=auto 2>/dev/null || ls -alFG 2>/dev/null || ls -alF'
-alias la='ls -A --color=auto 2>/dev/null || ls -AG 2>/dev/null || ls -A'
-alias l='ls -CF --color=auto 2>/dev/null || ls -CFG 2>/dev/null || ls -CF'
+# Color aliases (Linux uses --color=auto)
+alias ls='ls --color=auto'
+alias ll='ls -alF --color=auto'
+alias la='ls -A --color=auto'
+alias l='ls -CF --color=auto'
 alias grep='grep --color=auto'
 alias egrep='egrep --color=auto'
 alias fgrep='fgrep --color=auto'
