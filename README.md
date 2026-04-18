@@ -44,7 +44,25 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 
 ---
 
-### 4. Raspberry Pi Setup
+### 4. PVE Cluster Node Removal
+**Directory:** [`pve-node-remove/`](pve-node-remove/)
+**Script:** [`pve_node_remove.sh`](pve-node-remove/pve_node_remove.sh)
+
+Safely removes a node from a Proxmox VE cluster. Scans all cluster nodes, presents an interactive selection menu, then performs complete removal including cluster membership, SSH keys, /etc/hosts configuration, and cleanup of the removed node to standalone status.
+
+**Preflight Requirements:**
+- Healthy cluster with quorum
+- Root SSH access to ALL nodes
+- VMs/containers migrated off target node
+- No HA resources on target node
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pve-node-remove/pve_node_remove.sh)
+```
+
+---
+
+### 5. Raspberry Pi Setup
 **Directory:** [`pi-setup/`](pi-setup/)
 **Script:** [`pi-setup.sh`](pi-setup/pi-setup.sh)
 
@@ -62,7 +80,7 @@ sudo bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/
 
 ---
 
-### 5. Technitium DNS Server — Full Installation
+### 6. Technitium DNS Server — Full Installation
 **Directory:** [`dns-server/`](dns-server/)
 **Script:** [`technitium-dns-install.sh`](dns-server/technitium-dns-install.sh)
 
@@ -86,7 +104,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 ---
 
-### 6. Nginx Proxy Manager — Full Installation & Dynamic SSL Proxy
+### 7. Nginx Proxy Manager — Full Installation & Dynamic SSL Proxy
 **Directory:** [`npm-reverse-proxy/`](npm-reverse-proxy/)
 **Script:** [`nginx-proxy-manager-install.sh`](npm-reverse-proxy/nginx-proxy-manager-install.sh)
 
@@ -116,7 +134,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 ---
 
-### 7. Kali-Style Prompt Installer (Linux)
+### 8. Kali-Style Prompt Installer (Linux)
 **Directory:** [`kali-prompt/`](kali-prompt/)
 **Script:** [`kali-prompt-install.sh`](kali-prompt/kali-prompt-install.sh)
 
@@ -138,7 +156,7 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 ---
 
-### 8. Kali-Style Prompt Installer (macOS)
+### 9. Kali-Style Prompt Installer (macOS)
 **Directory:** [`kali-prompt-macos/`](kali-prompt-macos/)
 **Script:** [`kali-prompt-macos-install.sh`](kali-prompt-macos/kali-prompt-macos-install.sh)
 
@@ -176,11 +194,11 @@ All scripts share the same Van Auken Tech visual identity:
 
 ## Requirements
 
-- Scripts 1–3: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
-- Script 4: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
-- Scripts 5–6: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
-- Script 7: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
-- Script 8: macOS 12.7.6+ (Monterey or later) · Intel or Apple Silicon · User-level access
+- Scripts 1–4: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
+- Script 5: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
+- Scripts 6–7: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
+- Script 8: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
+- Script 9: macOS 12.7.6+ (Monterey or later) · Intel or Apple Silicon · User-level access
 - All scripts require internet connectivity. Missing dependencies are auto-installed.
 
 ---
