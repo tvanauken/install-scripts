@@ -179,6 +179,28 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 ---
 
+### 10. PVE VM & CT Cleanup
+**Directory:** [`pve-vm-ct-cleanup/`](pve-vm-ct-cleanup/)
+**Script:** [`pve_vm_ct_cleanup.sh`](pve-vm-ct-cleanup/pve_vm_ct_cleanup.sh)
+
+> ⚠ **IRREVERSIBLE OPERATION** — All data will be permanently destroyed.
+> No undo. Backups deleted. Snapshots removed.
+
+Completely removes a VM or container from Proxmox VE, including **all** associated resources. Presents an interactive menu to select from discovered VMs and CTs, then performs an 8-step comprehensive cleanup with multi-layer confirmation.
+
+**Features:**
+- Interactive selection of all VMs and containers
+- Multi-layer confirmation (VMID entry + "DESTROY" keyword)
+- Complete cleanup: Stop → Remove HA → Remove replication → Remove snapshots → Remove backups → Remove storage → Delete guest → Verify removal
+- Full operation logging to `/var/log/`
+- Supports PVE 8.x and 9.x
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/pve-vm-ct-cleanup/pve_vm_ct_cleanup.sh)
+```
+
+---
+
 ## Visual Standard
 
 All scripts share the same Van Auken Tech visual identity:
@@ -194,7 +216,7 @@ All scripts share the same Van Auken Tech visual identity:
 
 ## Requirements
 
-- Scripts 1–4: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
+- Scripts 1–4, 10: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
 - Script 5: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
 - Scripts 6–7: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
 - Script 8: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
