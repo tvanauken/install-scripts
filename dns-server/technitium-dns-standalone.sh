@@ -18,8 +18,7 @@
 #  - .NET 9.0 Runtime (ASP.NET Core)
 #  - Technitium DNS Server (latest version)
 #  - Advanced Blocking, Auto PTR, Drop Requests, Log Exporter, Query Logs (Sqlite) apps
-#  - Hagezi blocklists (multi, popupads, tif, fake)
-#  - Root hints DNS recursion (no forwarders)
+#  - Default DNS settings (configure blocklists and recursion via web UI)
 #  - 2 CPU cores, 2GB RAM, 8GB disk (adjustable)
 #=================================================================================================================
 
@@ -248,49 +247,36 @@ curl -fsSL https://download.technitium.com/dns/install.sh | bash >/dev/null 2>&1
 sleep 30
 
 # Get API token
-TOKEN=\$(cat /etc/dns/dns.config | jq -r '.webServiceRootApiToken // empty')
-if [ -z \"\$TOKEN\" ]; then
-    echo 'Failed to get API token'
-    exit 1
+TOKEN=\$(cat /etc/dns/dns.config 2>/dev/null | jq -r '.webServiceRootApiToken // empty' 2>/dev/null)
+if [ -n \"\$TOKEN\" ]; then
+    # Store credentials
+    echo \"token=\$TOKEN\" > /etc/dns/.creds
+    chmod 600 /etc/dns/.creds
+    
+    # Wait for API
+    sleep 5
+    
+    # Install apps
+    curl -fsSL https://download.technitium.com/dns/apps/AdvancedBlockingApp-v10.zip -o /tmp/AdvancedBlocking.zip 2>/dev/null
+    curl -X POST -F 'dnsApp=@/tmp/AdvancedBlocking.zip' \"http://localhost:5380/api/apps/install?token=\$TOKEN\" >/dev/null 2>&1
+    rm -f /tmp/AdvancedBlocking.zip
+    
+    curl -fsSL https://download.technitium.com/dns/apps/AutoPtrApp-v4.zip -o /tmp/AutoPtr.zip 2>/dev/null
+    curl -X POST -F 'dnsApp=@/tmp/AutoPtr.zip' \"http://localhost:5380/api/apps/install?token=\$TOKEN\" >/dev/null 2>&1
+    rm -f /tmp/AutoPtr.zip
+    
+    curl -fsSL https://download.technitium.com/dns/apps/DropRequestsApp-v7.zip -o /tmp/DropRequests.zip 2>/dev/null
+    curl -X POST -F 'dnsApp=@/tmp/DropRequests.zip' \"http://localhost:5380/api/apps/install?token=\$TOKEN\" >/dev/null 2>&1
+    rm -f /tmp/DropRequests.zip
+    
+    curl -fsSL https://download.technitium.com/dns/apps/LogExporterApp-v2.1.zip -o /tmp/LogExporter.zip 2>/dev/null
+    curl -X POST -F 'dnsApp=@/tmp/LogExporter.zip' \"http://localhost:5380/api/apps/install?token=\$TOKEN\" >/dev/null 2>&1
+    rm -f /tmp/LogExporter.zip
+    
+    curl -fsSL https://download.technitium.com/dns/apps/QueryLogsSqliteApp-v8.zip -o /tmp/QueryLogs.zip 2>/dev/null
+    curl -X POST -F 'dnsApp=@/tmp/QueryLogs.zip' \"http://localhost:5380/api/apps/install?token=\$TOKEN\" >/dev/null 2>&1
+    rm -f /tmp/QueryLogs.zip
 fi
-
-# Store credentials
-echo \"token=\$TOKEN\" > /etc/dns/.creds
-chmod 600 /etc/dns/.creds
-
-# Wait for API
-sleep 5
-
-# Install apps
-curl -fsSL https://download.technitium.com/dns/apps/AdvancedBlockingApp-v10.zip -o /tmp/AdvancedBlocking.zip
-curl -X POST -F 'dnsApp=@/tmp/AdvancedBlocking.zip' \"http://localhost:5380/api/apps/install?token=\$TOKEN\" >/dev/null 2>&1
-rm /tmp/AdvancedBlocking.zip
-
-curl -fsSL https://download.technitium.com/dns/apps/AutoPtrApp-v4.zip -o /tmp/AutoPtr.zip
-curl -X POST -F 'dnsApp=@/tmp/AutoPtr.zip' \"http://localhost:5380/api/apps/install?token=\$TOKEN\" >/dev/null 2>&1
-rm /tmp/AutoPtr.zip
-
-curl -fsSL https://download.technitium.com/dns/apps/DropRequestsApp-v7.zip -o /tmp/DropRequests.zip
-curl -X POST -F 'dnsApp=@/tmp/DropRequests.zip' \"http://localhost:5380/api/apps/install?token=\$TOKEN\" >/dev/null 2>&1
-rm /tmp/DropRequests.zip
-
-curl -fsSL https://download.technitium.com/dns/apps/LogExporterApp-v2.1.zip -o /tmp/LogExporter.zip
-curl -X POST -F 'dnsApp=@/tmp/LogExporter.zip' \"http://localhost:5380/api/apps/install?token=\$TOKEN\" >/dev/null 2>&1
-rm /tmp/LogExporter.zip
-
-curl -fsSL https://download.technitium.com/dns/apps/QueryLogsSqliteApp-v8.zip -o /tmp/QueryLogs.zip
-curl -X POST -F 'dnsApp=@/tmp/QueryLogs.zip' \"http://localhost:5380/api/apps/install?token=\$TOKEN\" >/dev/null 2>&1
-rm /tmp/QueryLogs.zip
-
-# Configure blocklists
-BLOCKLISTS='https://gitlab.com/hagezi/mirror/-/raw/main/dns-blocklists/adblock/multi.txt'
-BLOCKLISTS=\"\$BLOCKLISTS,https://gitlab.com/hagezi/mirror/-/raw/main/dns-blocklists/adblock/popupads.txt\"
-BLOCKLISTS=\"\$BLOCKLISTS,https://gitlab.com/hagezi/mirror/-/raw/main/dns-blocklists/adblock/tif.txt\"
-BLOCKLISTS=\"\$BLOCKLISTS,https://gitlab.com/hagezi/mirror/-/raw/main/dns-blocklists/adblock/fake.txt\"
-curl -X POST \"http://localhost:5380/api/settings/set?token=\$TOKEN&blockListUrls=\$BLOCKLISTS&enableBlocking=true\" >/dev/null 2>&1
-
-# Configure DNS recursion
-curl -X POST \"http://localhost:5380/api/settings/set?token=\$TOKEN&recursion=Allow&randomizeName=false&qnameMinimization=true\" >/dev/null 2>&1
 
 # Cleanup
 apt-get -y autoremove >/dev/null 2>&1
