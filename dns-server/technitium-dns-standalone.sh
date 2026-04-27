@@ -79,26 +79,32 @@ echo -e "${BL}Container Configuration${CL}"
 echo -e "${BL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${CL}\n"
 
 # Prompt for hostname
-read -p "$(echo -e ${GN}Hostname${CL} [technitium-dns]: )" HOSTNAME
+printf "  ${GN}Hostname${CL} [technitium-dns]: "
+read -r HOSTNAME
 HOSTNAME=${HOSTNAME:-technitium-dns}
 
 # Prompt for network configuration
 echo -e "\n${GN}Network Configuration${CL}"
 echo -e "  1) DHCP (automatic)"
 echo -e "  2) Static IP"
-read -p "$(echo -e Select option [1]: )" NET_CHOICE
+printf "  Select option [1]: "
+read -r NET_CHOICE
 NET_CHOICE=${NET_CHOICE:-1}
 
 if [[ $NET_CHOICE == "2" ]]; then
-    read -p "$(echo -e ${GN}IP Address/CIDR${CL} [e.g., 192.168.1.100/24]: )" STATIC_IP
+    printf "  ${GN}IP Address/CIDR${CL} [e.g., 192.168.1.100/24]: "
+    read -r STATIC_IP
     while [[ -z $STATIC_IP ]]; do
-        echo -e "${RD}IP address is required for static configuration${CL}"
-        read -p "$(echo -e ${GN}IP Address/CIDR${CL}: )" STATIC_IP
+        echo -e "  ${RD}IP address is required for static configuration${CL}"
+        printf "  ${GN}IP Address/CIDR${CL}: "
+        read -r STATIC_IP
     done
-    read -p "$(echo -e ${GN}Gateway${CL} [e.g., 192.168.1.1]: )" GATEWAY
+    printf "  ${GN}Gateway${CL} [e.g., 192.168.1.1]: "
+    read -r GATEWAY
     while [[ -z $GATEWAY ]]; do
-        echo -e "${RD}Gateway is required for static configuration${CL}"
-        read -p "$(echo -e ${GN}Gateway${CL}: )" GATEWAY
+        echo -e "  ${RD}Gateway is required for static configuration${CL}"
+        printf "  ${GN}Gateway${CL}: "
+        read -r GATEWAY
     done
     NET_CONFIG="name=eth0,bridge=vmbr0,ip=$STATIC_IP,gw=$GATEWAY"
 else
@@ -106,15 +112,18 @@ else
 fi
 
 # Prompt for CPU cores
-read -p "$(echo -e \\n${GN}CPU Cores${CL} [2]: )" CORES
+printf "\n  ${GN}CPU Cores${CL} [2]: "
+read -r CORES
 CORES=${CORES:-2}
 
 # Prompt for RAM
-read -p "$(echo -e ${GN}RAM (MB)${CL} [2048]: )" MEMORY
+printf "  ${GN}RAM (MB)${CL} [2048]: "
+read -r MEMORY
 MEMORY=${MEMORY:-2048}
 
 # Prompt for disk size
-read -p "$(echo -e ${GN}Disk Size (GB)${CL} [8]: )" DISK
+printf "  ${GN}Disk Size (GB)${CL} [8]: "
+read -r DISK
 DISK=${DISK:-8}
 
 echo -e "\n${BL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${CL}"
@@ -132,7 +141,8 @@ echo -e "  RAM: ${GN}$MEMORY MB${CL}"
 echo -e "  Disk: ${GN}$DISK GB${CL}"
 echo -e "${BL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${CL}\n"
 
-read -p "$(echo -e ${YW}Proceed with installation? [Y/n]:${CL} )" CONFIRM
+printf "  ${YW}Proceed with installation? [Y/n]: ${CL}"
+read -r CONFIRM
 CONFIRM=${CONFIRM:-Y}
 if [[ ! $CONFIRM =~ ^[Yy]$ ]]; then
     echo -e "\n${RD}Installation cancelled${CL}"
