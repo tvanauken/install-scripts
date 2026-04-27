@@ -1,15 +1,49 @@
-# Technitium DNS — Post-Install Configuration
+# Technitium DNS Server Scripts
 
 > Created by: Thomas Van Auken — Van Auken Tech  
-> Version: 1.0.0
+> Collection Version: 3.0.0
 
 ---
 
 ## Overview
 
-Configures a fresh Technitium DNS LXC (installed via Proxmox community-scripts) for UniFi network integration with privacy-first DNS.
+Three scripts for deploying Technitium DNS Server on Proxmox VE:
 
-## Pre-requisites
+1. **Standalone Installation** — Creates LXC and installs DNS server in one command
+2. **Full Installation + UniFi** — Installs with UniFi network integration
+3. **Post-Install Configuration** — Adds UniFi integration to existing installations
+
+---
+
+## 1. Standalone Installation (New!)
+
+**Purpose:** One-command deployment of Technitium DNS Server in a new LXC container.
+
+**Target:** Proxmox VE nodes (runs from node shell)
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/technitium-dns-standalone.sh)
+```
+
+**What It Does:**
+- Creates Debian 13 LXC (2 CPU, 2GB RAM, 8GB disk)
+- Installs Technitium DNS Server with .NET runtime
+- Installs 5 apps (Advanced Blocking, Auto PTR, Drop Requests, Log Exporter, Query Logs)
+- Configures 4 Hagezi blocklists
+- Enables root hints recursion (privacy-first)
+- No configuration prompts — enterprise defaults
+
+**Documentation:** [Standalone Manual](docs/technitium-dns-standalone-manual.md) | [Quick README](docs/technitium-dns-standalone-README.md)
+
+---
+
+## 2. Full Installation with UniFi Integration
+
+**Purpose:** Installs Technitium DNS with automatic UniFi network discovery and dynamic zone creation.
+
+**Target:** Existing LXC containers (install LXC first via community-scripts)
+
+**Prerequisites:**
 
 1. **Fresh Technitium LXC** via community-scripts:
    ```bash
@@ -18,7 +52,34 @@ Configures a fresh Technitium DNS LXC (installed via Proxmox community-scripts) 
 2. **UniFi controller** accessible on the network
 3. **Root access** to the LXC
 
-## Usage
+**Usage:**
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/technitium-dns-install.sh)
+```
+
+**What It Does:**
+- Surveys UniFi to discover all networks
+- Creates DNS zones for each VLAN
+- Deploys sync script for automatic A/PTR records
+- Configures root hints recursion (no forwarders)
+- Sets up cron job for dynamic updates
+
+**Documentation:** [Full Manual](docs/user-manual.md)
+
+---
+
+## 3. Post-Install Configuration (UniFi Integration)
+
+**Purpose:** Adds UniFi integration to an already-installed Technitium DNS server.
+
+**Prerequisites:**
+
+1. **Technitium DNS already installed** (via community-scripts or manual install)
+2. **UniFi controller** accessible on the network
+3. **Root access** to the LXC
+
+**Usage:**
 
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/technitium-dns-configure.sh)

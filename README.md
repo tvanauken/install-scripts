@@ -201,6 +201,36 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 ---
 
+### 11. Technitium DNS Server — Standalone LXC Installation
+**Directory:** [`dns-server/`](dns-server/)
+**Script:** [`technitium-dns-standalone.sh`](dns-server/technitium-dns-standalone.sh)
+
+> **Standalone installer** — creates LXC container and installs Technitium DNS in one command.
+> Runs from Proxmox node — no existing LXC required.
+
+**Features:**
+- Creates Debian 13 LXC container (2 CPU, 2GB RAM, 8GB disk)
+- Installs Technitium DNS Server with .NET 9.0 runtime
+- Installs 5 pre-configured apps:
+  - Advanced Blocking v10
+  - Auto PTR v4
+  - Drop Requests v7
+  - Log Exporter v2.1
+  - Query Logs (Sqlite) v8
+- Configures 4 Hagezi blocklists (multi, popupads, tif, fake)
+- Privacy-first root hints recursion (no external forwarders)
+- QNAME minimization enabled
+- Auto-detects storage pools
+- No configuration prompts — enterprise defaults
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/technitium-dns-standalone.sh)
+```
+
+*Full installer with UniFi integration also available:* [`technitium-dns-install.sh`](dns-server/technitium-dns-install.sh)
+
+---
+
 ## Visual Standard
 
 All scripts share the same Van Auken Tech visual identity:
@@ -216,7 +246,7 @@ All scripts share the same Van Auken Tech visual identity:
 
 ## Requirements
 
-- Scripts 1–4, 10: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
+- Scripts 1–4, 10–11: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
 - Script 5: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
 - Scripts 6–7: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
 - Script 8: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
