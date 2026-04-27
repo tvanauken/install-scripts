@@ -19,7 +19,7 @@
 #  - Technitium DNS Server (latest version)
 #  - Advanced Blocking, Auto PTR, Drop Requests, Log Exporter, Query Logs (Sqlite) apps
 #  - Default DNS settings (configure blocklists and recursion via web UI)
-#  - 2 CPU cores, 2GB RAM, 8GB disk (adjustable)
+#  - Interactive configuration (hostname, IP, CPU, RAM, disk)
 #=================================================================================================================
 
 # Van Auken Tech color scheme
@@ -74,16 +74,83 @@ PASS="$(openssl rand -base64 12)"
 # Get next available CT ID
 CTID=$(pvesh get /cluster/nextid)
 
+echo -e "${BL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${CL}"
+echo -e "${BL}Container Configuration${CL}"
+echo -e "${BL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${CL}\n"
+
+# Prompt for hostname
+read -p "$(echo -e ${GN}Hostname${CL} [technitium-dns]: )" HOSTNAME
+HOSTNAME=${HOSTNAME:-technitium-dns}
+
+# Prompt for network configuration
+echo -e "\n${GN}Network Configuration${CL}"
+echo -e "  1) DHCP (automatic)"
+echo -e "  2) Static IP"
+read -p "$(echo -e Select option [1]: )" NET_CHOICE
+NET_CHOICE=${NET_CHOICE:-1}
+
+if [[ $NET_CHOICE == "2" ]]; then
+    read -p "$(echo -e ${GN}IP Address/CIDR${CL} [e.g., 192.168.1.100/24]: )" STATIC_IP
+    while [[ -z $STATIC_IP ]]; do
+        echo -e "${RD}IP address is required for static configuration${CL}"
+        read -p "$(echo -e ${GN}IP Address/CIDR${CL}: )" STATIC_IP
+    done
+    read -p "$(echo -e ${GN}Gateway${CL} [e.g., 192.168.1.1]: )" GATEWAY
+    while [[ -z $GATEWAY ]]; do
+        echo -e "${RD}Gateway is required for static configuration${CL}"
+        read -p "$(echo -e ${GN}Gateway${CL}: )" GATEWAY
+    done
+    NET_CONFIG="name=eth0,bridge=vmbr0,ip=$STATIC_IP,gw=$GATEWAY"
+else
+    NET_CONFIG="name=eth0,bridge=vmbr0,ip=dhcp"
+fi
+
+# Prompt for CPU cores
+read -p "$(echo -e \\n${GN}CPU Cores${CL} [2]: )" CORES
+CORES=${CORES:-2}
+
+# Prompt for RAM
+read -p "$(echo -e ${GN}RAM (MB)${CL} [2048]: )" MEMORY
+MEMORY=${MEMORY:-2048}
+
+# Prompt for disk size
+read -p "$(echo -e ${GN}Disk Size (GB)${CL} [8]: )" DISK
+DISK=${DISK:-8}
+
+echo -e "\n${BL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${CL}"
+echo -e "${YW}Configuration Summary:${CL}"
+echo -e "  Container ID: ${GN}$CTID${CL}"
+echo -e "  Hostname: ${GN}$HOSTNAME${CL}"
+if [[ $NET_CHOICE == "2" ]]; then
+    echo -e "  IP Address: ${GN}$STATIC_IP${CL}"
+    echo -e "  Gateway: ${GN}$GATEWAY${CL}"
+else
+    echo -e "  IP Address: ${GN}DHCP${CL}"
+fi
+echo -e "  CPU Cores: ${GN}$CORES${CL}"
+echo -e "  RAM: ${GN}$MEMORY MB${CL}"
+echo -e "  Disk: ${GN}$DISK GB${CL}"
+echo -e "${BL}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${CL}\n"
+
+read -p "$(echo -e ${YW}Proceed with installation? [Y/n]:${CL} )" CONFIRM
+CONFIRM=${CONFIRM:-Y}
+if [[ ! $CONFIRM =~ ^[Yy]$ ]]; then
+    echo -e "\n${RD}Installation cancelled${CL}"
+    exit 0
+fi
+
+echo
+
 # Container configuration
 PCT_OPTIONS=(
   -features keyctl=1,nesting=1
-  -hostname technitium-dns
+  -hostname "$HOSTNAME"
   -tags van-auken-tech
   -onboot 1
-  -cores 2
-  -memory 2048
+  -cores "$CORES"
+  -memory "$MEMORY"
   -password "$PASS"
-  -net0 name=eth0,bridge=vmbr0,ip=dhcp
+  -net0 "$NET_CONFIG"
   -unprivileged 1
   -ostype debian
 )
@@ -183,7 +250,7 @@ fi
 
 # Combine all options
 PCT_OPTIONS=(${PCT_OPTIONS[@]:-${DEFAULT_PCT_OPTIONS[@]}})
-[[ " ${PCT_OPTIONS[@]} " =~ " -rootfs " ]] || PCT_OPTIONS+=(-rootfs $CONTAINER_STORAGE:8)
+[[ " ${PCT_OPTIONS[@]} " =~ " -rootfs " ]] || PCT_OPTIONS+=(-rootfs $CONTAINER_STORAGE:$DISK)
 
 # Create LXC Container
 msg_info "Creating LXC Container"
