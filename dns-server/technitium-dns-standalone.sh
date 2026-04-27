@@ -241,47 +241,11 @@ apt-get -y upgrade >/dev/null 2>&1
 # Install dependencies
 apt-get install -y curl sudo mc gnupg ca-certificates jq wget lsb-release >/dev/null 2>&1
 
-# Add Microsoft repository for Debian
-# Debian 13 (trixie) uses bookworm packages as trixie repos don't exist yet
-DEBIAN_VERSION=12
-curl -fsSL https://packages.microsoft.com/config/debian/\${DEBIAN_VERSION}/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb
-dpkg -i /tmp/packages-microsoft-prod.deb >/dev/null 2>&1
-rm -f /tmp/packages-microsoft-prod.deb
-apt-get update >/dev/null 2>&1
-
-# Install .NET 9.0 Runtime
-apt-get install -y aspnetcore-runtime-9.0 >/dev/null 2>&1
-
-# Download Technitium DNS Server
-mkdir -p /opt/technitium/dns /etc/dns
-curl -fsSL https://download.technitium.com/dns/DnsServerPortable.tar.gz -o /tmp/DnsServerPortable.tar.gz
-tar -xzf /tmp/DnsServerPortable.tar.gz -C /opt/technitium/dns
-rm /tmp/DnsServerPortable.tar.gz
-
-# Create systemd service
-cat <<'SERVICEEOF' >/etc/systemd/system/dns.service
-[Unit]
-Description=Technitium DNS Server
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/technitium/dns
-ExecStart=/usr/bin/dotnet /opt/technitium/dns/DnsServerApp.dll /etc/dns
-Restart=on-failure
-RestartPreventExitStatus=1
-RestartSec=5s
-
-[Install]
-WantedBy=multi-user.target
-SERVICEEOF
-
-systemctl daemon-reload
-systemctl enable -q --now dns.service
+# Install Technitium DNS Server using official installer (includes .NET runtime and systemd service)
+curl -fsSL https://download.technitium.com/dns/install.sh | bash >/dev/null 2>&1
 
 # Wait for service to start
-sleep 20
+sleep 30
 
 # Get API token
 TOKEN=\$(cat /etc/dns/dns.config | jq -r '.webServiceRootApiToken // empty')
