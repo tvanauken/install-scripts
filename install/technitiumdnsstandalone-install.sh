@@ -70,23 +70,6 @@ if [ -n "$TOKEN" ]; then
     
     msg_ok "Installed Technitium Apps"
     
-    # Install Hagezi blocklists
-    msg_info "Installing Hagezi blocklists"
-    
-    # Pro++ Blocklist
-    curl -fsSL -X POST "http://localhost:5380/api/apps/config/set?token=$TOKEN&name=Advanced%20Blocking&config=%7B%22enableBlocking%22%3Atrue%2C%22allowListUrls%22%3A%5B%5D%2C%22blockListUrls%22%3A%5B%22https%3A%2F%2Fraw.githubusercontent.com%2Fhagezi%2Fdns-blocklists%2Fmain%2Fadblock%2Fpro.plus.txt%22%5D%2C%22blockingBypassList%22%3A%5B%5D%7D" >/dev/null 2>&1
-    
-    # TIF Blocklist
-    curl -fsSL -X POST "http://localhost:5380/api/apps/config/set?token=$TOKEN&name=Advanced%20Blocking%20%282%29&config=%7B%22enableBlocking%22%3Atrue%2C%22allowListUrls%22%3A%5B%5D%2C%22blockListUrls%22%3A%5B%22https%3A%2F%2Fraw.githubusercontent.com%2Fhagezi%2Fdns-blocklists%2Fmain%2Fadblock%2Ftif.txt%22%5D%2C%22blockingBypassList%22%3A%5B%5D%7D" >/dev/null 2>&1
-    
-    # DynDNS Blocklist
-    curl -fsSL -X POST "http://localhost:5380/api/apps/config/set?token=$TOKEN&name=Advanced%20Blocking%20%283%29&config=%7B%22enableBlocking%22%3Atrue%2C%22allowListUrls%22%3A%5B%5D%2C%22blockListUrls%22%3A%5B%22https%3A%2F%2Fraw.githubusercontent.com%2Fhagezi%2Fdns-blocklists%2Fmain%2Fadblock%2Fdyndns.txt%22%5D%2C%22blockingBypassList%22%3A%5B%5D%7D" >/dev/null 2>&1
-    
-    # Badware Hoster Blocklist
-    curl -fsSL -X POST "http://localhost:5380/api/apps/config/set?token=$TOKEN&name=Advanced%20Blocking%20%284%29&config=%7B%22enableBlocking%22%3Atrue%2C%22allowListUrls%22%3A%5B%5D%2C%22blockListUrls%22%3A%5B%22https%3A%2F%2Fraw.githubusercontent.com%2Fhagezi%2Fdns-blocklists%2Fmain%2Fadblock%2Fhoster.txt%22%5D%2C%22blockingBypassList%22%3A%5B%5D%7D" >/dev/null 2>&1
-    
-    msg_ok "Installed Hagezi blocklists"
-    
     # Configure root hints recursion
     msg_info "Configuring DNS recursion"
     curl -fsSL -X POST "http://localhost:5380/api/settings/set?token=$TOKEN&recursion=UseRootHints&recursionDeniedNetworks=&recursionAllowedNetworks=&randomizeName=true&qnameMinimization=true&nsRevalidation=true&qpmLimitRequests=3000&qpmLimitErrors=300&qpmLimitSampleMinutes=5&qpmLimitIPv4PrefixLength=24&qpmLimitIPv6PrefixLength=56&serveStale=true&serveStaleTtl=259200&cacheMinimumRecordTtl=10&cacheMaximumRecordTtl=86400&cacheNegativeRecordTtl=300&cacheFailureRecordTtl=60&cachePrefetchEligibility=2&cachePrefetchTrigger=9&cachePrefetchSampleIntervalInMinutes=5&cachePrefetchSampleEligibilityHitsPerHour=30" >/dev/null 2>&1
