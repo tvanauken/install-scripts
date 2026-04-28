@@ -5,79 +5,60 @@
 # Repository: https://github.com/tvanauken/install-scripts
 # Source: https://technitium.com/dns/
 
-source /dev/stdin <<<"$FUNCTIONS_FILE_PATH"
-color
-verb_ip6
-catch_errors
-setting_up_container
-network_check
-update_os
+set -euo pipefail
 
-msg_info "Installing Dependencies"
-setup_deb822_repo \
-  "microsoft" \
-  "https://packages.microsoft.com/keys/microsoft-2025.asc" \
-  "https://packages.microsoft.com/debian/13/prod/" \
-  "trixie" \
-  "main"
-$STD apt install -y aspnetcore-runtime-10.0
-msg_ok "Installed Dependencies"
+# Update system
+apt-get update >/dev/null 2>&1
+apt-get -y upgrade >/dev/null 2>&1
 
+# Install dependencies
+apt-get install -y curl wget gnupg2 ca-certificates apt-transport-https jq >/dev/null 2>&1
+
+# Add Microsoft repo for .NET
+wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/microsoft-prod.gpg
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/13/prod trixie main" > /etc/apt/sources.list.d/microsoft-prod.list
+apt-get update >/dev/null 2>&1
+apt-get install -y aspnetcore-runtime-10.0 >/dev/null 2>&1
+
+# Install Technitium using official installer
 RELEASE=$(curl -fsSL https://technitium.com/dns/ | grep -oP 'Version \K[\d.]+')
-fetch_and_deploy_from_url "https://download.technitium.com/dns/DnsServerPortable.tar.gz" /opt/technitium/dns
+mkdir -p /opt/technitium/dns
+curl -fsSL https://download.technitium.com/dns/DnsServerPortable.tar.gz | tar -xz -C /opt/technitium/dns
 echo "${RELEASE}" >~/.technitium
 
-msg_info "Creating service"
+# Create service
 mkdir -p /etc/dns /var/log/technitium/dns
 sed -i '/^User=/d;/^Group=/d' /opt/technitium/dns/systemd.service
 cp /opt/technitium/dns/systemd.service /etc/systemd/system/technitium.service
-systemctl enable -q --now technitium
-msg_ok "Service created"
+systemctl enable --now technitium >/dev/null 2>&1
 
-# Wait for Technitium to start
-msg_info "Waiting for Technitium API to be ready"
-sleep 15
+# Wait for service to start
+sleep 20
 
 # Get API token
 TOKEN=$(cat /etc/dns/dns.config 2>/dev/null | jq -r '.webServiceRootApiToken // empty' 2>/dev/null)
 if [ -n "$TOKEN" ]; then
-    msg_info "Installing Technitium Apps"
-    
-    # Advanced Blocking v10
-    curl -fsSL https://download.technitium.com/dns/apps/AdvancedBlockingApp-v10.zip -o /tmp/AdvancedBlocking.zip 2>/dev/null
+    # Install apps
+    curl -fsSL https://download.technitium.com/dns/apps/AdvancedBlockingApp-v10.zip -o /tmp/AdvancedBlocking.zip
     curl -X POST -F 'dnsApp=@/tmp/AdvancedBlocking.zip' "http://localhost:5380/api/apps/install?token=$TOKEN" >/dev/null 2>&1
     rm -f /tmp/AdvancedBlocking.zip
     
-    # Auto PTR v4
-    curl -fsSL https://download.technitium.com/dns/apps/AutoPtrApp-v4.zip -o /tmp/AutoPtr.zip 2>/dev/null
+    curl -fsSL https://download.technitium.com/dns/apps/AutoPtrApp-v4.zip -o /tmp/AutoPtr.zip
     curl -X POST -F 'dnsApp=@/tmp/AutoPtr.zip' "http://localhost:5380/api/apps/install?token=$TOKEN" >/dev/null 2>&1
     rm -f /tmp/AutoPtr.zip
     
-    # Drop Requests v7
-    curl -fsSL https://download.technitium.com/dns/apps/DropRequestsApp-v7.zip -o /tmp/DropRequests.zip 2>/dev/null
+    curl -fsSL https://download.technitium.com/dns/apps/DropRequestsApp-v7.zip -o /tmp/DropRequests.zip
     curl -X POST -F 'dnsApp=@/tmp/DropRequests.zip' "http://localhost:5380/api/apps/install?token=$TOKEN" >/dev/null 2>&1
     rm -f /tmp/DropRequests.zip
     
-    # Log Exporter v2.1
-    curl -fsSL https://download.technitium.com/dns/apps/LogExporterApp-v2.1.zip -o /tmp/LogExporter.zip 2>/dev/null
+    curl -fsSL https://download.technitium.com/dns/apps/LogExporterApp-v2.1.zip -o /tmp/LogExporter.zip
     curl -X POST -F 'dnsApp=@/tmp/LogExporter.zip' "http://localhost:5380/api/apps/install?token=$TOKEN" >/dev/null 2>&1
     rm -f /tmp/LogExporter.zip
     
-    # Query Logs (Sqlite) v8
-    curl -fsSL https://download.technitium.com/dns/apps/QueryLogsSqliteApp-v8.zip -o /tmp/QueryLogs.zip 2>/dev/null
+    curl -fsSL https://download.technitium.com/dns/apps/QueryLogsSqliteApp-v8.zip -o /tmp/QueryLogs.zip
     curl -X POST -F 'dnsApp=@/tmp/QueryLogs.zip' "http://localhost:5380/api/apps/install?token=$TOKEN" >/dev/null 2>&1
     rm -f /tmp/QueryLogs.zip
     
-    msg_ok "Installed Technitium Apps"
-    
-    # Configure root hints recursion
-    msg_info "Configuring DNS recursion"
-    curl -fsSL -X POST "http://localhost:5380/api/settings/set?token=$TOKEN&recursion=UseRootHints&recursionDeniedNetworks=&recursionAllowedNetworks=&randomizeName=true&qnameMinimization=true&nsRevalidation=true&qpmLimitRequests=3000&qpmLimitErrors=300&qpmLimitSampleMinutes=5&qpmLimitIPv4PrefixLength=24&qpmLimitIPv6PrefixLength=56&serveStale=true&serveStaleTtl=259200&cacheMinimumRecordTtl=10&cacheMaximumRecordTtl=86400&cacheNegativeRecordTtl=300&cacheFailureRecordTtl=60&cachePrefetchEligibility=2&cachePrefetchTrigger=9&cachePrefetchSampleIntervalInMinutes=5&cachePrefetchSampleEligibilityHitsPerHour=30" >/dev/null 2>&1
-    msg_ok "Configured DNS recursion"
-else
-    msg_warn "Could not retrieve API token - apps and configuration will need to be set up manually"
+    # Configure recursion to use root hints only
+    curl -fsSL -X POST "http://localhost:5380/api/settings/set?token=$TOKEN&recursion=UseRootHints" >/dev/null 2>&1
 fi
-
-motd_ssh
-customize
-cleanup_lxc
