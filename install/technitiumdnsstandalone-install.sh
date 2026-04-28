@@ -10,7 +10,7 @@ set -euo pipefail
 # Update system and install dependencies
 apt-get update >/dev/null 2>&1
 apt-get -y upgrade >/dev/null 2>&1
-apt-get install -y curl wget libicu72 python3 >/dev/null 2>&1
+apt-get install -y curl wget libicu76 python3 >/dev/null 2>&1
 
 # Install .NET ASP.NET Core Runtime using official Microsoft install script
 wget -qO /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
