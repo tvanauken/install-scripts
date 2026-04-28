@@ -10,18 +10,17 @@ set -euo pipefail
 # Update system and install dependencies
 apt-get update >/dev/null 2>&1
 apt-get -y upgrade >/dev/null 2>&1
-apt-get install -y curl wget libicu76 python3 >/dev/null 2>&1
+apt-get install -y curl libicu76 python3 >/dev/null 2>&1
 
 # Install .NET ASP.NET Core Runtime using official Microsoft install script
-wget -qO /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
-chmod +x /tmp/dotnet-install.sh
-/tmp/dotnet-install.sh --channel 10.0 --runtime aspnetcore --install-dir /usr/share/dotnet --no-path
-rm -f /tmp/dotnet-install.sh
+curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0 --runtime aspnetcore --install-dir /usr/share/dotnet --no-path
 ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 
-# Download and install Technitium DNS Server portable archive
+# Download Technitium DNS Server portable archive with curl SSL workaround
 mkdir -p /opt/technitium/dns
-wget -qO- https://download.technitium.com/dns/DnsServerPortable.tar.gz | tar -xz -C /opt/technitium/dns
+# Use HTTP/1.1 with retry logic to handle OpenSSL 3.x SSL_read EOF issue
+curl --http1.1 --no-keepalive --retry 3 --retry-delay 2 --retry-max-time 60 -fsSL \
+  https://download.technitium.com/dns/DnsServerPortable.tar.gz | tar -xz -C /opt/technitium/dns
 
 # Disable systemd-resolved to free port 53
 systemctl disable --now systemd-resolved >/dev/null 2>&1 || true
@@ -83,7 +82,7 @@ try:
             install_data = urllib.parse.urlencode({"name": app["name"], "url": app["url"]}).encode()
             req = urllib.request.Request(base + "/api/apps/downloadAndInstall", install_data)
             req.add_header("Authorization", "Bearer " + token)
-            urllib.request.urlopen(req, timeout=60)
+            urllib.request.urlopen(req, timeout=120)
 except Exception as e:
     print(f"App install failed: {e}", file=sys.stderr)
 
@@ -99,12 +98,12 @@ try:
 except Exception as e:
     print(f"Recursion config failed: {e}", file=sys.stderr)
 
-# Enable logging with query logging
+# Enable logging with query logging (UTC time)
 try:
     log_data = urllib.parse.urlencode({
         "enableLogging": "true",
         "logQueries": "true",
-        "useLocalTime": "true",
+        "useLocalTime": "false",
         "logFolder": "logs"
     }).encode()
     req = urllib.request.Request(base + "/api/settings/set", log_data)
