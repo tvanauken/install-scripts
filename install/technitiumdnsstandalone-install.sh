@@ -7,58 +7,110 @@
 
 set -euo pipefail
 
-# Update system
+# Update system and install dependencies
 apt-get update >/dev/null 2>&1
 apt-get -y upgrade >/dev/null 2>&1
+apt-get install -y curl wget libicu72 python3 >/dev/null 2>&1
 
-# Install dependencies
-apt-get install -y curl wget gnupg2 ca-certificates apt-transport-https jq >/dev/null 2>&1
+# Install .NET ASP.NET Core Runtime using official Microsoft install script
+wget -qO /tmp/dotnet-install.sh https://dot.net/v1/dotnet-install.sh
+chmod +x /tmp/dotnet-install.sh
+/tmp/dotnet-install.sh --channel 10.0 --runtime aspnetcore --install-dir /usr/share/dotnet --no-path
+rm -f /tmp/dotnet-install.sh
+ln -sf /usr/share/dotnet/dotnet /usr/bin/dotnet
 
-# Add Microsoft repo for .NET
-wget -qO- https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/microsoft-prod.gpg
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/13/prod trixie main" > /etc/apt/sources.list.d/microsoft-prod.list
-apt-get update >/dev/null 2>&1
-apt-get install -y aspnetcore-runtime-10.0 >/dev/null 2>&1
-
-# Install Technitium using official installer
-RELEASE=$(curl -fsSL https://technitium.com/dns/ | grep -oP 'Version \K[\d.]+')
+# Download and install Technitium DNS Server portable archive
 mkdir -p /opt/technitium/dns
-curl -fsSL https://download.technitium.com/dns/DnsServerPortable.tar.gz | tar -xz -C /opt/technitium/dns
-echo "${RELEASE}" >~/.technitium
+wget -qO- https://download.technitium.com/dns/DnsServerPortable.tar.gz | tar -xz -C /opt/technitium/dns
 
-# Create service
-mkdir -p /etc/dns /var/log/technitium/dns
-sed -i '/^User=/d;/^Group=/d' /opt/technitium/dns/systemd.service
-cp /opt/technitium/dns/systemd.service /etc/systemd/system/technitium.service
-systemctl enable --now technitium >/dev/null 2>&1
+# Disable systemd-resolved to free port 53
+systemctl disable --now systemd-resolved >/dev/null 2>&1 || true
 
-# Wait for service to start
-sleep 20
+# Create systemd service
+cat > /etc/systemd/system/dns.service <<'EOF'
+[Unit]
+Description=Technitium DNS Server
+After=network.target
 
-# Get API token
-TOKEN=$(cat /etc/dns/dns.config 2>/dev/null | jq -r '.webServiceRootApiToken // empty' 2>/dev/null)
-if [ -n "$TOKEN" ]; then
-    # Install apps
-    curl -fsSL https://download.technitium.com/dns/apps/AdvancedBlockingApp-v10.zip -o /tmp/AdvancedBlocking.zip
-    curl -X POST -F 'dnsApp=@/tmp/AdvancedBlocking.zip' "http://localhost:5380/api/apps/install?token=$TOKEN" >/dev/null 2>&1
-    rm -f /tmp/AdvancedBlocking.zip
+[Service]
+Type=simple
+ExecStart=/usr/bin/dotnet /opt/technitium/dns/DnsServerApp.dll /etc/dns
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+mkdir -p /etc/dns
+systemctl daemon-reload
+systemctl enable --now dns >/dev/null 2>&1
+
+# Wait for DNS service to start and API to become available
+for i in {1..30}; do
+    if curl -sf http://127.0.0.1:5380 >/dev/null 2>&1; then
+        break
+    fi
+    sleep 2
+done
+
+# Configure DNS server via API using Python
+python3 <<'PYEOF'
+import json, urllib.request, urllib.parse, sys
+
+base = "http://127.0.0.1:5380"
+
+# Login and get session token
+try:
+    login_data = urllib.parse.urlencode({"user": "admin", "pass": "admin"}).encode()
+    req = urllib.request.Request(base + "/api/user/login", login_data)
+    login_res = urllib.request.urlopen(req, timeout=30).read().decode()
+    token = json.loads(login_res)["token"]
+except Exception as e:
+    print(f"API login failed: {e}", file=sys.stderr)
+    sys.exit(1)
+
+# Get store app list and install required apps
+app_names = ["Advanced Blocking", "DNS Block List (DNSBL)", "Failover", "Geo Country", "What Is My Dns"]
+try:
+    req = urllib.request.Request(base + "/api/apps/listStoreApps")
+    req.add_header("Authorization", "Bearer " + token)
+    store_res = urllib.request.urlopen(req, timeout=30).read().decode()
+    store_apps = json.loads(store_res)["response"]["storeApps"]
     
-    curl -fsSL https://download.technitium.com/dns/apps/AutoPtrApp-v4.zip -o /tmp/AutoPtr.zip
-    curl -X POST -F 'dnsApp=@/tmp/AutoPtr.zip' "http://localhost:5380/api/apps/install?token=$TOKEN" >/dev/null 2>&1
-    rm -f /tmp/AutoPtr.zip
-    
-    curl -fsSL https://download.technitium.com/dns/apps/DropRequestsApp-v7.zip -o /tmp/DropRequests.zip
-    curl -X POST -F 'dnsApp=@/tmp/DropRequests.zip' "http://localhost:5380/api/apps/install?token=$TOKEN" >/dev/null 2>&1
-    rm -f /tmp/DropRequests.zip
-    
-    curl -fsSL https://download.technitium.com/dns/apps/LogExporterApp-v2.1.zip -o /tmp/LogExporter.zip
-    curl -X POST -F 'dnsApp=@/tmp/LogExporter.zip' "http://localhost:5380/api/apps/install?token=$TOKEN" >/dev/null 2>&1
-    rm -f /tmp/LogExporter.zip
-    
-    curl -fsSL https://download.technitium.com/dns/apps/QueryLogsSqliteApp-v8.zip -o /tmp/QueryLogs.zip
-    curl -X POST -F 'dnsApp=@/tmp/QueryLogs.zip' "http://localhost:5380/api/apps/install?token=$TOKEN" >/dev/null 2>&1
-    rm -f /tmp/QueryLogs.zip
-    
-    # Configure recursion to use root hints only
-    curl -fsSL -X POST "http://localhost:5380/api/settings/set?token=$TOKEN&recursion=UseRootHints" >/dev/null 2>&1
-fi
+    for app in store_apps:
+        if app["name"] in app_names:
+            install_data = urllib.parse.urlencode({"name": app["name"], "url": app["url"]}).encode()
+            req = urllib.request.Request(base + "/api/apps/downloadAndInstall", install_data)
+            req.add_header("Authorization", "Bearer " + token)
+            urllib.request.urlopen(req, timeout=60)
+except Exception as e:
+    print(f"App install failed: {e}", file=sys.stderr)
+
+# Configure recursion ACLs (empty = allow all)
+try:
+    settings_data = urllib.parse.urlencode({
+        "recursionDeniedNetworks": "",
+        "recursionAllowedNetworks": ""
+    }).encode()
+    req = urllib.request.Request(base + "/api/settings/set", settings_data)
+    req.add_header("Authorization", "Bearer " + token)
+    urllib.request.urlopen(req, timeout=30)
+except Exception as e:
+    print(f"Recursion config failed: {e}", file=sys.stderr)
+
+# Enable logging with query logging
+try:
+    log_data = urllib.parse.urlencode({
+        "enableLogging": "true",
+        "logQueries": "true",
+        "useLocalTime": "true",
+        "logFolder": "logs"
+    }).encode()
+    req = urllib.request.Request(base + "/api/settings/set", log_data)
+    req.add_header("Authorization", "Bearer " + token)
+    urllib.request.urlopen(req, timeout=30)
+except Exception as e:
+    print(f"Logging config failed: {e}", file=sys.stderr)
+
+PYEOF
