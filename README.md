@@ -271,6 +271,57 @@ For production replication that queries an existing server's API and duplicates 
 
 ---
 
+### 13. PVE Cluster Removal (Generic)
+**Directory:** [`pve-cluster-removal/`](pve-cluster-removal/)
+**Script:** [`pve_cluster_removal.sh`](pve-cluster-removal/pve_cluster_removal.sh)
+
+> **Universal cluster removal** — works on ANY Proxmox VE node regardless of cluster state.
+> Automatically detects and adapts to healthy, broken, or standalone configurations.
+
+**Use Cases:**
+- Last surviving node of a failed cluster
+- Node in a broken/unhealthy cluster (not quorate)
+- Node with all other nodes offline
+- Node you want to remove from any cluster
+- Already standalone node (cleans remnants)
+
+**Features:**
+- Automatic state detection (clustered/broken/standalone)
+- Works on ANY cluster health state
+- Complete backup before changes
+- VMs, containers, storage never touched
+- Idempotent — safe to run multiple times
+- 12-step process with intelligent fallbacks
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pve-cluster-removal/pve_cluster_removal.sh)
+```
+
+---
+
+### 14. Van Auken Home Cluster Removal
+**Directory:** [`pve-cluster-deconfig/`](pve-cluster-deconfig/)
+**Script:** [`pve_cluster_deconfig.sh`](pve-cluster-deconfig/pve_cluster_deconfig.sh)
+
+> **Environment-specific cluster removal** for Van Auken Tech infrastructure.
+> Tailored to VanAukenHome cluster specifications.
+
+**Use Case:**
+- Deconfigure VanAukenHome cluster nodes to standalone
+- Based on successful titan node deconfiguration
+
+**Features:**
+- 19-step detailed process
+- Environment-specific optimizations
+- Complete backup and documentation
+- Tested on VanAukenHome cluster
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pve-cluster-deconfig/pve_cluster_deconfig.sh)
+```
+
+---
+
 ## Visual Standard
 
 All scripts share the same Van Auken Tech visual identity:
@@ -286,7 +337,7 @@ All scripts share the same Van Auken Tech visual identity:
 
 ## Requirements
 
-- Scripts 1–4, 10–11: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
+- Scripts 1–4, 10–14: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
 - Script 5: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
 - Scripts 6–7: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
 - Script 8: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
