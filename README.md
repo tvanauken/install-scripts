@@ -322,6 +322,19 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 
 ---
 
+### 15. Repair Technitium Corrupted SQLite Database Errors
+**Directory:** [`technitium-sqlite-repair/`](technitium-sqlite-repair/)
+**Script:** [`technitium_sqlite_repair.sh`](technitium-sqlite-repair/technitium_sqlite_repair.sh)
+
+Automatically repairs "SQLite Error 11: database disk image is malformed" errors on a Technitium DNS Server by gracefully stopping the service, purging the corrupted database file, and restarting the service to generate a clean slate.
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/technitium-sqlite-repair/technitium_sqlite_repair.sh)
+```
+
+---
+
+
 ## Visual Standard
 
 All scripts share the same Van Auken Tech visual identity:
@@ -337,7 +350,7 @@ All scripts share the same Van Auken Tech visual identity:
 
 ## Requirements
 
-- Scripts 1–4, 10–14: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
+- Scripts 1–4, 10–15: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
 - Script 5: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
 - Scripts 6–7: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
 - Script 8: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
@@ -347,15 +360,3 @@ All scripts share the same Van Auken Tech visual identity:
 ---
 
 *Van Auken Tech · Thomas Van Auken*
-
-### 15. Repair Technitium Corrupted SQLite Database Errors
-**Directory:** [`technitium-sqlite-repair/`](technitium-sqlite-repair/)
-**Script:** [`technitium_sqlite_repair.sh`](technitium-sqlite-repair/technitium_sqlite_repair.sh)
-
-Automatically repairs "SQLite Error 11: database disk image is malformed" errors on a Technitium DNS Server by gracefully stopping the service, purging the corrupted database file, and restarting the service to generate a clean slate.
-
-```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/technitium-sqlite-repair/technitium_sqlite_repair.sh)
-```
-
----
