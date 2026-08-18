@@ -75,6 +75,19 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt-macos/kali-prompt-macos-install.sh)
 ```
 
+## Visual Standard
+
+All scripts share the same Van Auken Tech visual identity:
+
+| Element | Style |
+|---------|-------|
+| Header | figlet "small" font — VANAUKEN TECH |
+| Colour palette | `RD` `YW` `GN` `DGN` `BL` `CL` `BLD` |
+| Section dividers | `── Section Name ──────────...` (cyan/bold) |
+| Status symbols | ✔ green · ✘ red · ⚠ yellow · ◆ cyan · ▸ cyan |
+| Summary block | `════════` style (cyan/bold) |
+| Footer | `────────` with host + timestamp |
+
 ---
 
 *Created by: Thomas Van Auken — Van Auken Tech*

@@ -334,6 +334,14 @@ bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/
 
 ---
 
+## Requirements
+
+- Scripts 1–4, 10–15: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
+- Script 5: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
+- Scripts 6–7: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
+- Script 8: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
+- Script 9: macOS 12.7.6+ (Monterey or later) · Intel or Apple Silicon · User-level access
+- All scripts require internet connectivity. Missing dependencies are auto-installed.
 
 ## Visual Standard
 
@@ -347,15 +355,6 @@ All scripts share the same Van Auken Tech visual identity:
 | Status symbols | ✔ green · ✘ red · ⚠ yellow · ◆ cyan · ▸ cyan |
 | Summary block | `════════` style (cyan/bold) |
 | Footer | `────────` with host + timestamp |
-
-## Requirements
-
-- Scripts 1–4, 10–15: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
-- Script 5: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
-- Scripts 6–7: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
-- Script 8: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
-- Script 9: macOS 12.7.6+ (Monterey or later) · Intel or Apple Silicon · User-level access
-- All scripts require internet connectivity. Missing dependencies are auto-installed.
 
 ---
 
