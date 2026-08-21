@@ -8,7 +8,7 @@
 
 A collection of custom scripts for Van Auken Tech infrastructure, all adhering to the **Van Auken Tech standard** for script design and visual presentation. Every script in this collection shares a unified look, feel, and behaviour.
 
-Scripts 1–4 and 10 target Proxmox VE hosts directly. Script 5 targets Raspberry Pi hardware. Scripts 6–7 configure already-deployed LXC containers — install the LXC first from community-scripts.org, then run the script. Scripts 8–9 are cross-platform prompt installers.
+Scripts 1–4, 10–11 target Proxmox VE hosts directly. Script 5 targets Raspberry Pi hardware. Scripts 6–7 configure already-deployed LXC containers — install the LXC first from community-scripts.org, then run the script. Scripts 8–9 are cross-platform prompt installers.
 
 ---
 
@@ -26,11 +26,10 @@ Scripts 1–4 and 10 target Proxmox VE hosts directly. Script 5 targets Raspberr
 | 8 | Kali-Style Prompt (Linux) | [`kali-prompt/`](../kali-prompt/) | Any Linux | **2.1.0** | Authentic Kali two-line prompt on any distro |
 | 9 | **Kali-Style Prompt (macOS)** | [`kali-prompt-macos/`](../kali-prompt-macos/) | **macOS 12.7.6+** | 2.0.0 | Authentic Kali-style prompt on Intel/Apple Silicon Macs |
 | 10 | **PVE VM & CT Cleanup** | [`pve-vm-ct-cleanup/`](../pve-vm-ct-cleanup/) | **Proxmox VE** | **1.0.0** | Complete VM/CT removal with storage, snapshots, backups |
-| 11 | **Technitium DNS Standalone** | [`dns-server/`](../dns-server/) | **Debian/Ubuntu** | **1.0.0** | Standalone DNS Server LXC deployment |
-| 12 | **Technitium DNS Generic** | [`install/`](../install/) | **Debian 13** | **1.0.0** | Generic Installer with 5 hardcoded apps |
-| 13 | **PVE Cluster Removal** | [`pve-cluster-removal/`](../pve-cluster-removal/) | **Proxmox VE** | **1.0.0** | Generic cluster removal script |
-| 14 | **Van Auken Home Cluster Deconfig** | [`pve-cluster-deconfig/`](../pve-cluster-deconfig/) | **Proxmox VE** | **1.0.0** | Environment-specific cluster removal |
-| 15 | **Technitium SQLite Repair** | [`technitium-sqlite-repair/`](../technitium-sqlite-repair/) | **Technitium** | **1.0.0** | Repairs corrupted SQLite DB errors by resetting files |
+| 11 | **Technitium DNS (Standalone)** | [`dns-server/`](../dns-server/) | **Proxmox VE** | **1.0.0** | Creates LXC + installs DNS server in one command |
+| 12 | **Technitium DNS (Generic)** | [`install/`](../install/) | **Debian 13** | **1.0.0** | Generic DNS installer with hardcoded 5-app config |
+| 13 | **Cisco 2600XM Terminal Server** | [`cisco-terminal-server/`](../cisco-terminal-server/) | **Cisco IOS** | **1.0.0** | Configures Cisco 2600XM as 32-port terminal server with paged menu system |
+| 15 | Houston UI Installer | [`houston-ui/`](../houston-ui/) | Proxmox VE / Ubuntu | 1.0.0 | Installs 45Drives Houston UI & Cockpit |
 
 > ⚠ Script 4 requires a **healthy PVE cluster** with quorum and root SSH access to all nodes. Target node must be empty (no VMs/containers).
 
@@ -46,6 +45,8 @@ Scripts 1–4 and 10 target Proxmox VE hosts directly. Script 5 targets Raspberr
 
 > 📖 See the [DNS & NPM Infrastructure Manual](dns-npm-infrastructure-manual.md) for complete documentation on deploying the DNS + reverse proxy pair.
 
+> 🔌 Script 13 configures a **Cisco 2600XM** as a 32-port terminal server with paged menu system. Serial ports default to 9600 8N1.
+
 ---
 
 ## Quick Reference — One-Liners
@@ -54,17 +55,22 @@ Scripts 1–4 and 10 target Proxmox VE hosts directly. Script 5 targets Raspberr
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/pve-node-remove/pve_node_remove.sh)
 ```
-
 ### PVE VM & CT Cleanup
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/pve-vm-ct-cleanup/pve_vm_ct_cleanup.sh)
 ```
 
-### Repair Technitium Corrupted SQLite Database Errors
+### Technitium DNS Server — Standalone LXC Installation
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/technitium-sqlite-repair/technitium_sqlite_repair.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/dns-server/technitium-dns-standalone.sh)
 ```
 
+### Technitium DNS Server — Generic Installer
+```bash
+curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/install/technitiumdnsgeneric-install.sh | bash
+```
+
+---
 ### Install Kali-Style Prompt (Any Linux Distro)
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt/kali-prompt-install.sh)
@@ -75,18 +81,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt-macos/kali-prompt-macos-install.sh)
 ```
 
-## Visual Standard
-
-All scripts share the same Van Auken Tech visual identity:
-
-| Element | Style |
-|---------|-------|
-| Header | figlet "small" font — VANAUKEN TECH |
-| Colour palette | `RD` `YW` `GN` `DGN` `BL` `CL` `BLD` |
-| Section dividers | `── Section Name ──────────...` (cyan/bold) |
-| Status symbols | ✔ green · ✘ red · ⚠ yellow · ◆ cyan · ▸ cyan |
-| Summary block | `════════` style (cyan/bold) |
-| Footer | `────────` with host + timestamp |
+- **Houston UI Installer:**
+  ```bash
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)"
+  ```
 
 ---
 

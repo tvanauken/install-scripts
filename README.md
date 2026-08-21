@@ -8,6 +8,13 @@ A collection of helper and utility scripts for Van Auken Tech infrastructure. Al
 
 ## Scripts
 
+### Houston UI & 45Drives Installer
+**Directory:** [`houston-ui/`](houston-ui/)
+**Script:** [`install.sh`](houston-ui/install.sh)
+
+Installs the 45Drives Houston UI, Cockpit, and ZFS plugins. Includes specialized logic to bypass hardware identification failures when running as a VM inside Proxmox with an HBA passed through, and interactively configures the chassis size.
+
+
 ### 1. CLI Tools Installer
 **Directory:** [`cli-tools/`](cli-tools/)
 **Script:** [`cli-tools-install.sh`](cli-tools/cli-tools-install.sh)
@@ -271,79 +278,33 @@ For production replication that queries an existing server's API and duplicates 
 
 ---
 
-### 13. PVE Cluster Removal (Generic)
-**Directory:** [`pve-cluster-removal/`](pve-cluster-removal/)
-**Script:** [`pve_cluster_removal.sh`](pve-cluster-removal/pve_cluster_removal.sh)
+### 13. Cisco 2600XM Terminal Server Configuration
+**Directory:** [`cisco-terminal-server/`](cisco-terminal-server/)
 
-> **Universal cluster removal** — works on ANY Proxmox VE node regardless of cluster state.
-> Automatically detects and adapts to healthy, broken, or standalone configurations.
-
-**Use Cases:**
-- Last surviving node of a failed cluster
-- Node in a broken/unhealthy cluster (not quorate)
-- Node with all other nodes offline
-- Node you want to remove from any cluster
-- Already standalone node (cleans remnants)
+> **Infrastructure device configuration** — transforms factory-default Cisco 2600XM into a production-ready 32-port terminal server.
+> All configuration applied interactively via reverse telnet through an existing terminal server.
 
 **Features:**
-- Automatic state detection (clustered/broken/standalone)
-- Works on ANY cluster health state
-- Complete backup before changes
-- VMs, containers, storage never touched
-- Idempotent — safe to run multiple times
-- 12-step process with intelligent fallbacks
+- 32 async serial ports (lines 33-64) mapped to TCP ports 2033-2064
+- Paged menu system (4 pages, 8 ports each) with full navigation
+- Dual access model: viewer (menu-only) and admin (full access)
+- Serial port defaults: 9600 baud, 8N1, no flow control
+- Local authentication with privilege-separated accounts
+- DNS integration with home.vanauken.tech
 
+**Access:**
 ```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pve-cluster-removal/pve_cluster_removal.sh)
+# Via existing terminal server (reverse telnet)
+telnet 192.168.200.254 2038
+# Send 2x Enter to wake console
+
+# Direct access (after configuration)
+telnet <device-ip>
+Username: admin
+Password: Wiicco@111!!
 ```
 
 ---
-
-### 14. Van Auken Home Cluster Removal
-**Directory:** [`pve-cluster-deconfig/`](pve-cluster-deconfig/)
-**Script:** [`pve_cluster_deconfig.sh`](pve-cluster-deconfig/pve_cluster_deconfig.sh)
-
-> **Environment-specific cluster removal** for Van Auken Tech infrastructure.
-> Tailored to VanAukenHome cluster specifications.
-
-**Use Case:**
-- Deconfigure VanAukenHome cluster nodes to standalone
-- Based on successful titan node deconfiguration
-
-**Features:**
-- 19-step detailed process
-- Environment-specific optimizations
-- Complete backup and documentation
-- Tested on VanAukenHome cluster
-
-```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/pve-cluster-deconfig/pve_cluster_deconfig.sh)
-```
-
----
-
-### 15. Repair Technitium Corrupted SQLite Database Errors
-**Directory:** [`technitium-sqlite-repair/`](technitium-sqlite-repair/)
-**Script:** [`technitium_sqlite_repair.sh`](technitium-sqlite-repair/technitium_sqlite_repair.sh)
-
-Automatically repairs "SQLite Error 11: database disk image is malformed" errors on a Technitium DNS Server by gracefully stopping the service, purging the corrupted database file, and restarting the service to generate a clean slate.
-
-```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/technitium-sqlite-repair/technitium_sqlite_repair.sh)
-```
-
----
-
-
-## Requirements
-
-- Scripts 1–4, 10–14: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
-- Script 15: Technitium DNS Server (Debian/Ubuntu with systemd) · Root access
-- Script 5: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
-- Scripts 6–7: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
-- Script 8: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
-- Script 9: macOS 12.7.6+ (Monterey or later) · Intel or Apple Silicon · User-level access
-- All scripts require internet connectivity. Missing dependencies are auto-installed.
 
 ## Visual Standard
 
@@ -357,6 +318,15 @@ All scripts share the same Van Auken Tech visual identity:
 | Status symbols | ✔ green · ✘ red · ⚠ yellow · ◆ cyan · ▸ cyan |
 | Summary block | `════════` style (cyan/bold) |
 | Footer | `────────` with host + timestamp |
+
+## Requirements
+
+- Scripts 1–4, 10–11: Proxmox VE 8.x (Debian Bookworm) or 9.x (Debian Trixie) · Root access
+- Script 5: Raspberry Pi hardware (armhf / arm64) · Raspberry Pi OS / Ubuntu / Kali Linux ARM / Debian · **sudo** required
+- Scripts 6–7: Requires LXC already deployed via community-scripts.org · Root access · Network access to LXC IP
+- Script 8: Any Linux distribution (Ubuntu, Debian, RHEL, Rocky, Fedora, derivatives) · User-level access
+- Script 9: macOS 12.7.6+ (Monterey or later) · Intel or Apple Silicon · User-level access
+- All scripts require internet connectivity. Missing dependencies are auto-installed.
 
 ---
 
