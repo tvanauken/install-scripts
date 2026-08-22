@@ -156,16 +156,20 @@ rm -f /tmp/setup-repo.sh
 if [[ "$PKG_MGR" == "apt" ]]; then
     msg_info "Setting apt preferences for 45Drives repo"
     cat <<EOF > /etc/apt/preferences.d/45drives.pref
+Package: cockpit* 45drives-tools
+Pin: origin "repo.45drives.com"
+Pin-Priority: 1000
+
 Package: *
 Pin: origin "repo.45drives.com"
-Pin-Priority: 100
+Pin-Priority: -1
 EOF
 fi
 
 msg_ok "45Drives repository added"
 
 section "Installing Packages"
-PACKAGES="cockpit cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs 45drives-tools"
+PACKAGES="cockpit cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs 45drives-tools realmd tuned udisks2-lvm2 zfsutils-linux samba winbind nfs-kernel-server nfs-client cockpit-scheduler"
 
 if [[ "$PKG_MGR" == "apt" ]]; then
     msg_info "Updating apt cache"
@@ -214,6 +218,70 @@ EOF
     systemctl reset-failed >> "$LOGFILE" 2>&1 || true
     msg_ok "Masked OpenIPMI service"
 fi
+
+msg_info "Applying Van Auken Tech Custom Branding"
+mkdir -p /usr/share/cockpit/branding/ubuntu
+cat << 'EOF' > /usr/share/cockpit/branding/ubuntu/van-auken-tech-logo.svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 80">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00e676;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00b0ff;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="900" fill="url(#grad)" filter="url(#glow)">Van Auken Tech</text>
+</svg>
+EOF
+
+cat << 'EOF' > /usr/share/cockpit/branding/ubuntu/van-auken-tech-bg.svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
+      <stop offset="0%" style="stop-color:#2a2a35;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0a0a0f;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bgGrad)"/>
+  <circle cx="10%" cy="20%" r="300" fill="#00e676" opacity="0.03" />
+  <circle cx="90%" cy="80%" r="400" fill="#00b0ff" opacity="0.03" />
+</svg>
+EOF
+
+cat << 'EOF' > /usr/share/cockpit/branding/ubuntu/branding.css
+body.login-pf {
+    background: url("van-auken-tech-bg.svg") no-repeat center center;
+    background-size: cover;
+    background-color: #0a0a0f;
+}
+
+#badge {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    inline-size: 220px;
+    block-size: 80px;
+    background-image: url("van-auken-tech-logo.svg");
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+#brand {
+    font-size: 18pt;
+    text-transform: uppercase;
+}
+
+#brand::before {
+    content: "Van Auken Tech UI";
+}
+EOF
+msg_ok "Applied Van Auken Tech Custom Branding"
 
 msg_info "Running 45Drives dmap utility"
 yes | dmap >> "$LOGFILE" 2>&1 || true
