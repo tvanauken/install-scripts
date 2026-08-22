@@ -189,27 +189,14 @@ section "Configuring Environment"
 if [[ "$ENV_TYPE" == "VM" ]]; then
     msg_info "Applying VM Hardware Spoofing"
     mkdir -p /etc/45drives/server_info/
-    cat > /etc/45drives/server_info/server_info.json <<EOF
-{
-    "Motherboard": {
-        "Manufacturer": "VIRTUAL_MACHINE",
-        "Product Name": "VM_MOTHERBOARD",
-        "Serial Number": "VIRTUAL_MACHINE"
-    },
-    "HBA": [],
-    "Hybrid": false,
-    "Serial": "VIRTUAL_MACHINE",
-    "Model": "${HW_MODEL}",
-    "Alias Style": "STORINATOR",
-    "Chassis Size": "${HW_CHASSIS}",
-    "VM": true,
-    "Edit Mode": true,
-    "OS NAME": "Linux",
-    "OS VERSION_ID": "",
-    "Auto Alias": false,
-    "HWRAID": false
-}
-EOF
+    
+    # Run dmap first so it discovers the passed-through HBA natively
+    yes | dmap >> "$LOGFILE" 2>&1 || true
+    
+    # Inject the chosen chassis size and model using jq
+    if [ -f /etc/45drives/server_info/server_info.json ]; then
+        jq '.Model = "'$HW_MODEL'" | ."Chassis Size" = "'$HW_CHASSIS'" | ."Edit Mode" = true' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
+    fi
     msg_ok "Applied VM hardware overrides"
 
     msg_info "Masking OpenIPMI (VM Environment)"
@@ -218,6 +205,12 @@ EOF
     systemctl reset-failed >> "$LOGFILE" 2>&1 || true
     msg_ok "Masked OpenIPMI service"
 fi
+
+msg_info "Allowing root login to Cockpit UI"
+if [ -f /etc/cockpit/disallowed-users ]; then
+    sed -i 's/^root/#root/' /etc/cockpit/disallowed-users
+fi
+msg_ok "Allowed root login"
 
 msg_info "Applying Van Auken Tech Custom Branding"
 mkdir -p /usr/share/cockpit/branding/ubuntu
