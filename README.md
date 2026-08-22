@@ -8,18 +8,6 @@ A collection of helper and utility scripts for Van Auken Tech infrastructure. Al
 
 ## Scripts
 
-### 14. Houston UI & 45Drives Installer
-**Directory:** [`houston-ui/`](houston-ui/)
-**Script:** [`install.sh`](houston-ui/install.sh)
-
-Installs the 45Drives Houston UI, Cockpit, and ZFS plugins. Includes specialized logic to bypass hardware identification failures when running as a VM inside Proxmox with an HBA passed through, and interactively configures the chassis size.
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)
-```
-
----
-
 ### 1. CLI Tools Installer
 **Directory:** [`cli-tools/`](cli-tools/)
 **Script:** [`cli-tools-install.sh`](cli-tools/cli-tools-install.sh)
@@ -307,6 +295,18 @@ telnet 192.168.200.254 2038
 telnet <device-ip>
 Username: admin
 Password: Wiicco@111!!
+```
+
+---
+
+### 14. Houston UI & 45Drives Installer
+**Directory:** [`houston-ui/`](houston-ui/)
+**Script:** [`install.sh`](houston-ui/install.sh)
+
+Installs the 45Drives Houston UI, Cockpit, and ZFS plugins. Includes specialized logic to bypass hardware identification failures when running as a VM inside Proxmox with an HBA passed through, and interactively configures the chassis size.
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)
 ```
 
 ---

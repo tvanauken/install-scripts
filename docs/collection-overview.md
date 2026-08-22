@@ -29,7 +29,7 @@ Scripts 1–4, 10–11 target Proxmox VE hosts directly. Script 5 targets Raspbe
 | 11 | **Technitium DNS (Standalone)** | [`dns-server/`](../dns-server/) | **Proxmox VE** | **1.0.0** | Creates LXC + installs DNS server in one command |
 | 12 | **Technitium DNS (Generic)** | [`install/`](../install/) | **Debian 13** | **1.0.0** | Generic DNS installer with hardcoded 5-app config |
 | 13 | **Cisco 2600XM Terminal Server** | [`cisco-terminal-server/`](../cisco-terminal-server/) | **Cisco IOS** | **1.0.0** | Configures Cisco 2600XM as 32-port terminal server with paged menu system |
-| 15 | Houston UI Installer | [`houston-ui/`](../houston-ui/) | Proxmox VE / Ubuntu | 1.0.0 | Installs 45Drives Houston UI & Cockpit |
+| 14 | Houston UI Installer | [`houston-ui/`](../houston-ui/) | Proxmox VE / Ubuntu | 1.0.0 | Installs 45Drives Houston UI & Cockpit |
 
 > ⚠ Script 4 requires a **healthy PVE cluster** with quorum and root SSH access to all nodes. Target node must be empty (no VMs/containers).
 
@@ -81,10 +81,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt-macos/kali-prompt-macos-install.sh)
 ```
 
-- **Houston UI Installer:**
-  ```bash
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)"
-  ```
+### Houston UI & 45Drives Installer
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)"
+```
 
 ---
 
