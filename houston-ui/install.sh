@@ -44,14 +44,14 @@ header_info() {
   clear
   echo -e "${BL}${BLD}"
   cat << 'BANNER'
-  _  _  ___ ___       _                 _    _               _              
- | || || __|   \ _ _ (_)_ _____ ___    | |_ | |___ _  _ ___ | |_ ___ _ _    
- | __ ||__ \ |) | '_|| \ V / -_)_-<    | ' \| / _ \ || (_-< |  _/ _ \ ' \   
- |_||_||___/___/|_|  |_|\_/\___/__/    |_||_|_\___/\_,_/__/  \__\___/_||_|  
-                                                                            
+  __     __               _         _                _____         _     
+  \ \   / /_ _ _ __      / \  _   _| | _____ _ __   |_   _|__  ___| |__  
+   \ \ / / _` | '_ \    / _ \| | | | |/ / _ \ '_ \    | |/ _ \/ __| '_ \ 
+    \ V / (_| | | | |  / ___ \ |_| |   <  __/ | | |   | |  __/ (__| | | |
+     \_/ \__,_|_| |_| /_/   \_\__,_|_|\_\___|_| |_|   |_|\___|\___|_| |_|
 BANNER
   echo -e "${CL}"
-  echo -e "${DGN}  ── 45Drives Houston UI Installer ───────────────────────────────────${CL}"
+  echo -e "${DGN}  ── Van Auken Tech Houston UI Installer ───────────────────────────────────${CL}"
   printf "  ${DGN}Host   :${CL}  ${BL}%s${CL}\n" "$(hostname -f 2>/dev/null || hostname)"
   printf "  ${DGN}Date   :${CL}  ${BL}%s${CL}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
   printf "  ${DGN}Log    :${CL}  ${BL}%s${CL}\n" "$LOGFILE"
@@ -135,9 +135,33 @@ fi
 
 section "Installing 45Drives Repository"
 msg_info "Adding 45Drives Repo"
+
+# Clean up any previously broken lists to prevent apt update failures
+rm -f /etc/apt/sources.list.d/45drives*.list
+
 curl -sSL https://repo.45drives.com/setup -o /tmp/setup-repo.sh
+
+# Patch setup-repo.sh for Ubuntu 24.04 (noble) compatibility using jammy repos
+sed -i '/curl -sSL.*45drives-enterprise-$distro_codename.list/c\
+    if [ "$distro_codename" = "noble" ]; then\n\
+        curl -sSL https://repo.45drives.com/repofiles/$custom_distro/45drives-enterprise-jammy.list -o /etc/apt/sources.list.d/45drives-enterprise-jammy.list\n\
+    else\n\
+        curl -sSL https://repo.45drives.com/repofiles/$custom_distro/45drives-enterprise-$distro_codename.list -o /etc/apt/sources.list.d/45drives-enterprise-$distro_codename.list\n\
+    fi' /tmp/setup-repo.sh
+sed -i 's/\[\[ "$distro_codename" != "trixie" \]\]/\[\[ "$distro_codename" != "trixie" \]\] \&\& \[\[ "$distro_codename" != "noble" \]\]/g' /tmp/setup-repo.sh
+
 bash /tmp/setup-repo.sh >> "$LOGFILE" 2>&1
 rm -f /tmp/setup-repo.sh
+
+if [[ "$PKG_MGR" == "apt" ]]; then
+    msg_info "Setting apt preferences for 45Drives repo"
+    cat <<EOF > /etc/apt/preferences.d/45drives.pref
+Package: *
+Pin: origin "repo.45drives.com"
+Pin-Priority: 100
+EOF
+fi
+
 msg_ok "45Drives repository added"
 
 section "Installing Packages"
