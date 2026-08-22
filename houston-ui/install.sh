@@ -169,7 +169,7 @@ fi
 msg_ok "45Drives repository added"
 
 section "Installing Packages"
-PACKAGES="cockpit cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs 45drives-tools realmd tuned udisks2-lvm2 zfsutils-linux samba winbind nfs-kernel-server nfs-client cockpit-scheduler"
+PACKAGES="cockpit-ceph cockpit-s3-browser cockpit-super-simple-setup cockpit-machines cockpit-podman cockpit cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs 45drives-tools realmd tuned udisks2-lvm2 zfsutils-linux samba winbind nfs-kernel-server nfs-client cockpit-scheduler"
 
 if [[ "$PKG_MGR" == "apt" ]]; then
     msg_info "Updating apt cache"
@@ -194,8 +194,18 @@ if [[ "$ENV_TYPE" == "VM" ]]; then
     yes | dmap >> "$LOGFILE" 2>&1 || true
     
     # Inject the chosen chassis size and model using jq
+    # NOTE: To render the full chassis uncropped in the UI, we force the spoof to NOT be a VM.
     if [ -f /etc/45drives/server_info/server_info.json ]; then
-        jq '.Model = "'$HW_MODEL'" | ."Chassis Size" = "'$HW_CHASSIS'" | ."Edit Mode" = true' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
+        jq '.Model = "'$HW_MODEL'" | ."Chassis Size" = "'$HW_CHASSIS'" | ."Edit Mode" = true | .VM = false | .Motherboard.Manufacturer = "45Drives" | .Motherboard."Product Name" = "Storinator" | .Motherboard."Serial Number" = "00000000" | .Serial = "00000000"' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
+    fi
+    
+    # Patch the underlying Python script so it stops aggressively resetting the VM flag and overwriting our spoofing
+    if [ -f /opt/45drives/tools/server_identifier ]; then
+        sed -i 's/server\["VM"\] = vm_check(server\["Motherboard"\])/server["VM"] = False/' /opt/45drives/tools/server_identifier
+        sed -i 's/def vm_passthrough(server):/def vm_passthrough(server):
+	pass
+
+def old_vm_passthrough(server):/' /opt/45drives/tools/server_identifier
     fi
     msg_ok "Applied VM hardware overrides"
 
@@ -275,6 +285,26 @@ body.login-pf {
 }
 EOF
 msg_ok "Applied Van Auken Tech Custom Branding"
+
+msg_info "Configuring NetworkManager for Cockpit Updates"
+if [[ "$PKG_MGR" == "apt" ]]; then
+    cat << 'NCONF' > /etc/NetworkManager/conf.d/20-connectivity.conf
+[connectivity]
+uri=http://archive.ubuntu.com/ubuntu/
+interval=300
+NCONF
+    
+    if grep -q "managed=false" /etc/NetworkManager/NetworkManager.conf; then
+        sed -i 's/managed=false/managed=true/' /etc/NetworkManager/NetworkManager.conf
+    fi
+    
+    # We leave netplan alone so we don't break network configs, just restarting NM allows it to perform the connectivity check
+    systemctl restart NetworkManager >> "$LOGFILE" 2>&1 || true
+    # Run pkcon refresh to prime packagekit
+    sleep 3
+    pkcon refresh >> "$LOGFILE" 2>&1 || true
+fi
+msg_ok "Configured NetworkManager"
 
 msg_info "Running 45Drives dmap utility"
 yes | dmap >> "$LOGFILE" 2>&1 || true
