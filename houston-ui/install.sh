@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  45Drives Houston UI & Cockpit Installer
+#  Van Auken Tech Houston UI & Cockpit Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
 #  Version:    1.0.0
-#  Date:       2026-08-21
+#  Date:       2026-08-22
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
 
@@ -67,35 +67,15 @@ if [[ $EUID -ne 0 ]]; then
    msg_error "This script must be run as root"
 fi
 
+# Ensure whiptail is available
 if ! command -v whiptail &> /dev/null; then
   msg_info "Installing whiptail"
-  if command -v apt-get &> /dev/null; then
-    apt-get update -y -qq >/dev/null 2>&1
-    apt-get install -y whiptail -qq >/dev/null 2>&1
-  elif command -v dnf &> /dev/null; then
-    dnf install -y newt -q >/dev/null 2>&1
-  fi
-  msg_ok "Installed whiptail"
+  apt-get update -y -qq >/dev/null 2>&1
+  apt-get install -y whiptail jq -qq >/dev/null 2>&1
+  msg_ok "Installed whiptail and jq"
 fi
 
-# OS Detection
-OS_ID=""
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    OS_ID=$ID
-fi
-
-if [[ "$OS_ID" == "ubuntu" || "$OS_ID" == "debian" ]]; then
-    PKG_MGR="apt"
-elif [[ "$OS_ID" == "rocky" || "$OS_ID" == "almalinux" || "$OS_ID" == "rhel" || "$OS_ID" == "centos" ]]; then
-    PKG_MGR="dnf"
-else
-    msg_error "Unsupported OS: $OS_ID. Only Ubuntu/Debian and RHEL/Rocky are supported."
-fi
-
-log "Detected OS: $OS_ID (Package Manager: $PKG_MGR)"
-
-# Ask Deployment Type
+# 1. Ask Deployment Type
 ENV_TYPE=$(whiptail --title "Deployment Environment" --radiolist \
 "Select the environment type for this installation:\n(VMs with HBA passthrough require special hardware spoofing)" 15 70 2 \
 "BAREMETAL" "Physical 45Drives Hardware" ON \
@@ -129,33 +109,19 @@ if [[ "$ENV_TYPE" == "VM" ]]; then
     else
         HW_MODEL="Storinator-$HW_CHASSIS"
     fi
-    
     log "Configured VM Hardware Spoofing: Model=$HW_MODEL, Chassis=$HW_CHASSIS"
 fi
 
 section "Installing 45Drives Repository"
-msg_info "Adding 45Drives Repo"
+msg_info "Configuring APT Sideloading"
 
-# Clean up any previously broken lists to prevent apt update failures
-rm -f /etc/apt/sources.list.d/45drives*.list
+# Import 45Drives GPG Key
+wget -qO - https://repo.45drives.com/key/gpg.asc | gpg --pinentry-mode loopback --batch --yes --dearmor -o /usr/share/keyrings/45drives-archive-keyring.gpg
+# Add the Jammy list (since Noble isn't natively supported by 45Drives yet)
+echo "deb [signed-by=/usr/share/keyrings/45drives-archive-keyring.gpg] https://repo.45drives.com/enterprise/ubuntu jammy main" > /etc/apt/sources.list.d/45drives-enterprise-jammy.list
 
-curl -sSL https://repo.45drives.com/setup -o /tmp/setup-repo.sh
-
-# Patch setup-repo.sh for Ubuntu 24.04 (noble) compatibility using jammy repos
-sed -i '/curl -sSL.*45drives-enterprise-$distro_codename.list/c\
-    if [ "$distro_codename" = "noble" ]; then\n\
-        curl -sSL https://repo.45drives.com/repofiles/$custom_distro/45drives-enterprise-jammy.list -o /etc/apt/sources.list.d/45drives-enterprise-jammy.list\n\
-    else\n\
-        curl -sSL https://repo.45drives.com/repofiles/$custom_distro/45drives-enterprise-$distro_codename.list -o /etc/apt/sources.list.d/45drives-enterprise-$distro_codename.list\n\
-    fi' /tmp/setup-repo.sh
-sed -i 's/\[\[ "$distro_codename" != "trixie" \]\]/\[\[ "$distro_codename" != "trixie" \]\] \&\& \[\[ "$distro_codename" != "noble" \]\]/g' /tmp/setup-repo.sh
-
-bash /tmp/setup-repo.sh >> "$LOGFILE" 2>&1
-rm -f /tmp/setup-repo.sh
-
-if [[ "$PKG_MGR" == "apt" ]]; then
-    msg_info "Setting apt preferences for 45Drives repo"
-    cat <<EOF > /etc/apt/preferences.d/45drives.pref
+msg_info "Setting apt preferences for 45Drives repo"
+cat <<PREF > /etc/apt/preferences.d/45drives.pref
 Package: cockpit* 45drives-tools
 Pin: origin "repo.45drives.com"
 Pin-Priority: 1000
@@ -163,27 +129,33 @@ Pin-Priority: 1000
 Package: *
 Pin: origin "repo.45drives.com"
 Pin-Priority: -1
-EOF
-fi
+PREF
 
-msg_ok "45Drives repository added"
+apt-get update -y -qq >> "$LOGFILE" 2>&1
+msg_ok "45Drives repository added and pinned"
 
 section "Installing Packages"
-PACKAGES="cockpit cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs 45drives-tools realmd tuned udisks2-lvm2 zfsutils-linux samba winbind nfs-kernel-server nfs-client cockpit-scheduler"
+msg_info "Installing dependencies and Houston UI"
+PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server podman cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser cockpit-super-simple-setup cockpit-machines cockpit-podman 45drives-tools"
+apt-get install -y -qq $PACKAGES >> "$LOGFILE" 2>&1
+msg_ok "Packages installed successfully"
 
-if [[ "$PKG_MGR" == "apt" ]]; then
-    msg_info "Updating apt cache"
-    apt-get update -y -qq >> "$LOGFILE" 2>&1
-    msg_ok "Updated apt cache"
-    
-    msg_info "Installing Houston packages (this may take a moment)"
-    apt-get install -y -qq $PACKAGES >> "$LOGFILE" 2>&1
-    msg_ok "Houston packages installed"
-else
-    msg_info "Installing Houston packages (this may take a moment)"
-    dnf install -y -q $PACKAGES >> "$LOGFILE" 2>&1
-    msg_ok "Houston packages installed"
+section "Configuring Networking"
+msg_info "Enabling NetworkManager Connectivity Checks"
+cat << 'NCONF' > /etc/NetworkManager/conf.d/20-connectivity.conf
+[connectivity]
+uri=http://archive.ubuntu.com/ubuntu/
+interval=300
+NCONF
+
+# Reconfigure NetworkManager if disabled
+if grep -q "managed=false" /etc/NetworkManager/NetworkManager.conf; then
+    sed -i 's/managed=false/managed=true/' /etc/NetworkManager/NetworkManager.conf
 fi
+
+systemctl restart NetworkManager >> "$LOGFILE" 2>&1 || true
+msg_ok "NetworkManager configured"
+
 
 section "Configuring Environment"
 if [[ "$ENV_TYPE" == "VM" ]]; then
@@ -193,9 +165,17 @@ if [[ "$ENV_TYPE" == "VM" ]]; then
     # Run dmap first so it discovers the passed-through HBA natively
     yes | dmap >> "$LOGFILE" 2>&1 || true
     
-    # Inject the chosen chassis size and model using jq
+    # Overwrite the server_info.json strictly setting VM=false and Edit Mode=true
     if [ -f /etc/45drives/server_info/server_info.json ]; then
-        jq '.Model = "'$HW_MODEL'" | ."Chassis Size" = "'$HW_CHASSIS'" | ."Edit Mode" = true' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
+        jq '.Model = "'$HW_MODEL'" | ."Chassis Size" = "'$HW_CHASSIS'" | ."Alias Style" = "STORINATOR" | ."Edit Mode" = true | .VM = false | .Motherboard.Manufacturer = "45Drives" | .Motherboard."Product Name" = "Storinator" | .Motherboard."Serial Number" = "00000000" | .Serial = "00000000"' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
+    fi
+    
+    # Patch the underlying Python script so it stops aggressively resetting the VM flag and overwriting our spoofing
+    if [ -f /opt/45drives/tools/server_identifier ]; then
+        # Force VM check to return False so it thinks it is physical
+        sed -i 's/server\["VM"\] = vm_check(server\["Motherboard"\])/server["VM"] = False/' /opt/45drives/tools/server_identifier
+        # Replace the vm_passthrough def with a pass to prevent it rewriting our fake chassis data
+        sed -i 's/def vm_passthrough(server):/def vm_passthrough(server):\n\tpass\n\ndef old_vm_passthrough(server):/' /opt/45drives/tools/server_identifier
     fi
     msg_ok "Applied VM hardware overrides"
 
@@ -214,7 +194,7 @@ msg_ok "Allowed root login"
 
 msg_info "Applying Van Auken Tech Custom Branding"
 mkdir -p /usr/share/cockpit/branding/ubuntu
-cat << 'EOF' > /usr/share/cockpit/branding/ubuntu/van-auken-tech-logo.svg
+cat << 'SVG1' > /usr/share/cockpit/branding/ubuntu/van-auken-tech-logo.svg
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 80">
   <defs>
     <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -231,9 +211,9 @@ cat << 'EOF' > /usr/share/cockpit/branding/ubuntu/van-auken-tech-logo.svg
   </defs>
   <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="900" fill="url(#grad)" filter="url(#glow)">Van Auken Tech</text>
 </svg>
-EOF
+SVG1
 
-cat << 'EOF' > /usr/share/cockpit/branding/ubuntu/van-auken-tech-bg.svg
+cat << 'SVG2' > /usr/share/cockpit/branding/ubuntu/van-auken-tech-bg.svg
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
   <defs>
     <radialGradient id="bgGrad" cx="50%" cy="50%" r="75%" fx="50%" fy="50%">
@@ -245,9 +225,9 @@ cat << 'EOF' > /usr/share/cockpit/branding/ubuntu/van-auken-tech-bg.svg
   <circle cx="10%" cy="20%" r="300" fill="#00e676" opacity="0.03" />
   <circle cx="90%" cy="80%" r="400" fill="#00b0ff" opacity="0.03" />
 </svg>
-EOF
+SVG2
 
-cat << 'EOF' > /usr/share/cockpit/branding/ubuntu/branding.css
+cat << 'CSS1' > /usr/share/cockpit/branding/ubuntu/branding.css
 body.login-pf {
     background: url("van-auken-tech-bg.svg") no-repeat center center;
     background-size: cover;
@@ -273,12 +253,9 @@ body.login-pf {
 #brand::before {
     content: "Van Auken Tech UI";
 }
-EOF
+CSS1
 msg_ok "Applied Van Auken Tech Custom Branding"
 
-msg_info "Running 45Drives dmap utility"
-yes | dmap >> "$LOGFILE" 2>&1 || true
-msg_ok "Executed dmap utility"
 
 msg_info "Restarting Cockpit service"
 systemctl enable --now cockpit.socket >> "$LOGFILE" 2>&1
@@ -286,6 +263,6 @@ systemctl restart cockpit >> "$LOGFILE" 2>&1
 msg_ok "Cockpit service restarted"
 
 echo ""
-echo -e "${GN}${BLD}  Houston UI installation is complete!${CL}"
+echo -e "${GN}${BLD}  Van Auken Tech Houston UI installation is complete!${CL}"
 echo -e "${BL}  Access the dashboard at: https://$(hostname -I | awk '{print $1}'):9090${CL}"
 echo ""
