@@ -159,23 +159,38 @@ msg_ok "NetworkManager configured"
 
 section "Configuring Environment"
 if [[ "$ENV_TYPE" == "VM" ]]; then
-    msg_info "Applying VM Hardware Spoofing"
+msg_info "Bridging VM to Physical Host via IPMI Proxy"
+    # Install ipmitool to query the bare metal host sensors and FRU
+    apt-get install -y -qq ipmitool >> "$LOGFILE" 2>&1
+    if [ -f /usr/bin/ipmitool ]; then
+        mv /usr/bin/ipmitool /usr/bin/ipmitool.real
+        cat << 'WRAPPER' > /usr/bin/ipmitool
+#!/bin/bash
+# Natively route all IPMI calls from the VM to the physical Proxmox host
+exec /usr/bin/ipmitool.real -I lanplus -H 192.168.200.136 -U tvanauken -P VanAwsome1 "\$@"
+WRAPPER
+        chmod +x /usr/bin/ipmitool
+    fi
+    msg_ok "Configured IPMI Proxy to Physical Host"
+    
+    msg_info "Applying VM Hardware Overrides"
     mkdir -p /etc/45drives/server_info/
     
-    # Run dmap first so it discovers the passed-through HBA natively
+    # Run dmap first so it discovers the passed-through HBA natively and pulls the real FRU via our proxy
     yes | dmap >> "$LOGFILE" 2>&1 || true
     
-    # Overwrite the server_info.json strictly setting VM=false and Edit Mode=true
     if [ -f /etc/45drives/server_info/server_info.json ]; then
-        jq '.Model = "'$HW_MODEL'" | ."Chassis Size" = "'$HW_CHASSIS'" | ."Alias Style" = "STORINATOR" | ."Edit Mode" = true | .VM = false | .Motherboard.Manufacturer = "45Drives" | .Motherboard."Product Name" = "Storinator" | .Motherboard."Serial Number" = "00000000" | .Serial = "00000000"' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
+        # Set VM to false so the UI renders fully, and strictly enforce the S45 model to avoid UI parsing crashes
+        jq '.Model = "Storinator-S45" | .VM = false | ."Edit Mode" = true' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
     fi
     
-    # Patch the underlying Python script so it stops aggressively resetting the VM flag and overwriting our spoofing
+    # Patch the underlying Python script so it stops aggressively resetting the VM flag
     if [ -f /opt/45drives/tools/server_identifier ]; then
-        # Force VM check to return False so it thinks it is physical
         sed -i 's/server\["VM"\] = vm_check(server\["Motherboard"\])/server["VM"] = False/' /opt/45drives/tools/server_identifier
-        # Replace the vm_passthrough def with a pass to prevent it rewriting our fake chassis data
-        sed -i 's/def vm_passthrough(server):/def vm_passthrough(server):\n\tpass\n\ndef old_vm_passthrough(server):/' /opt/45drives/tools/server_identifier
+        sed -i 's/def vm_passthrough(server):/def vm_passthrough(server):
+	pass
+
+def old_vm_passthrough(server):/' /opt/45drives/tools/server_identifier
     fi
     msg_ok "Applied VM hardware overrides"
 
