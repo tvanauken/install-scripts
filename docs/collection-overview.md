@@ -15,6 +15,9 @@ Scripts 1–4, 10–11 target Proxmox VE hosts directly. Script 5 targets Raspbe
 ## Scripts
 | Script | Command | Description |
 |---|---|---|
+| Houston UI | `bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)` | Installs Cockpit, 45Drives modules, and custom Van Auken Tech branding. |
+| Script | Command | Description |
+|---|---|---|
 | Houston UI | `bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)` | Installs Cockpit, 45Drives modules, and custom Van Auken Tech branding. | in This Collection
 
 | # | Script | Directory | Target | Version | Purpose |
