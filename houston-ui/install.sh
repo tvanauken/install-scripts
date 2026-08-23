@@ -199,10 +199,7 @@ WRAPPER
     # Patch the underlying Python script so it stops aggressively resetting the VM flag
     if [ -f /opt/45drives/tools/server_identifier ]; then
         sed -i 's/server\["VM"\] = vm_check(server\["Motherboard"\])/server["VM"] = False/' /opt/45drives/tools/server_identifier
-        sed -i 's/def vm_passthrough(server):/def vm_passthrough(server):
-	pass
-
-def old_vm_passthrough(server):/' /opt/45drives/tools/server_identifier
+        sed -i 's/def vm_passthrough(server):/def vm_passthrough(server):\n\tpass\n\ndef old_vm_passthrough(server):/' /opt/45drives/tools/server_identifier
     fi
     msg_ok "Applied VM hardware overrides"
 
