@@ -133,7 +133,9 @@ wget -qO - https://repo.45drives.com/key/gpg.asc | gpg --pinentry-mode loopback 
 echo "deb [signed-by=/usr/share/keyrings/45drives-archive-keyring.gpg] https://repo.45drives.com/enterprise/ubuntu jammy main" > /etc/apt/sources.list.d/45drives-enterprise-jammy.list
 
 msg_info "Setting apt preferences for 45Drives repo"
-cat <<PREF > /etc/apt/preferences.d/45drives.pref
+if [[ "$OS_ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]]; then
+    # Strict pinning for 24.04 to force OS-native ZFS and Samba
+    cat <<PREF > /etc/apt/preferences.d/45drives.pref
 Package: cockpit* 45drives-tools
 Pin: origin "repo.45drives.com"
 Pin-Priority: 1000
@@ -142,13 +144,20 @@ Package: *
 Pin: origin "repo.45drives.com"
 Pin-Priority: -1
 PREF
+else
+    # 22.04 and 20.04 require the 45Drives forks of ZFS (zfs-dkms/zfs-zed)
+    rm -f /etc/apt/preferences.d/45drives.pref
+fi
 
 apt-get update -y -qq >> "$LOGFILE" 2>&1
 msg_ok "45Drives repository added and pinned"
 
 section "Installing Packages"
 msg_info "Installing dependencies and Houston UI"
-PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server podman cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser cockpit-super-simple-setup cockpit-machines cockpit-podman 45drives-tools"
+PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server podman cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser cockpit-machines cockpit-podman 45drives-tools"
+if [[ "$VERSION_ID" == "24.04" ]]; then
+    PACKAGES="$PACKAGES cockpit-super-simple-setup"
+fi
 apt-get install -y -qq $PACKAGES >> "$LOGFILE" 2>&1
 msg_ok "Packages installed successfully"
 
