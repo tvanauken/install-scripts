@@ -188,8 +188,7 @@ WRAPPER
     msg_info "Applying VM Hardware Overrides"
     mkdir -p /etc/45drives/server_info/
     
-    # Run dmap first so it discovers the passed-through HBA natively and pulls the real FRU via our proxy
-    yes | dmap >> "$LOGFILE" 2>&1 || true
+
     
     if [ -f /etc/45drives/server_info/server_info.json ]; then
         # Set VM to false so the UI renders fully, and strictly enforce the S45 model to avoid UI parsing crashes
