@@ -92,7 +92,7 @@ HW_MODEL=""
 HW_CHASSIS=""
 if [[ "$ENV_TYPE" == "VM" ]]; then
     HW_CHASSIS=$(whiptail --title "Chassis Size" --menu "Select the emulated Chassis Size:" 15 60 6 \
-    "S45" "Storinator S45 (45 Drives)" \
+    "S45" "Storinator S45 Turbo (45 Drives)" \
     "Q30" "Storinator Q30 (30 Drives)" \
     "AV15" "Storinator AV15 (15 Drives)" \
     "HL15" "45HomeLab HL15 (15 Drives)" \
