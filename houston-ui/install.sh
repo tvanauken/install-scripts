@@ -103,13 +103,25 @@ if [[ "$ENV_TYPE" == "VM" ]]; then
         msg_error "Installation cancelled."
     fi
 
-    # Set Model name based on chassis
+# Set Model name based on chassis
     if [[ "$HW_CHASSIS" == "HL15" || "$HW_CHASSIS" == "HL8" ]]; then
         HW_MODEL="HomeLab-$HW_CHASSIS"
     else
         HW_MODEL="Storinator-$HW_CHASSIS"
     fi
     log "Configured VM Hardware Spoofing: Model=$HW_MODEL, Chassis=$HW_CHASSIS"
+
+    # Ask if we should proxy IPMI
+    if whiptail --title "IPMI Configuration" --yesno "Would you like to configure an IPMI Proxy to a physical Proxmox host for this VM? (Allows baremetal sensor passthrough)" 10 70; then
+        IPMI_PROXY="YES"
+        IPMI_HOST=$(whiptail --title "IPMI Configuration" --inputbox "Enter the IP address of the physical IPMI host:" 10 60 3>&1 1>&2 2>&3)
+        IPMI_USER=$(whiptail --title "IPMI Configuration" --inputbox "Enter the IPMI username:" 10 60 3>&1 1>&2 2>&3)
+        IPMI_PASS=$(whiptail --title "IPMI Configuration" --passwordbox "Enter the IPMI password:" 10 60 3>&1 1>&2 2>&3)
+        log "IPMI Proxy Enabled for $IPMI_HOST"
+    else
+        IPMI_PROXY="NO"
+        log "IPMI Proxy Disabled"
+    fi
 fi
 
 section "Installing 45Drives Repository"
