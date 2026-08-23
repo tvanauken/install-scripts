@@ -11,7 +11,7 @@ This document logs the development, refinement, and final validation of the `ins
 ### The Solution (V5 Implementation)
 1. **Strict APT Pinning:** The script injects `/etc/apt/preferences.d/45drives.pref` with a priority of `1000` for `cockpit-*` packages, forcing the UI to pull from 45Drives, while explicitly dropping priority for all other packages to `-1`. This allows Ubuntu 24.04 to use its native, stable backend dependencies (`samba`, `zfsutils-linux`).
 2. **NetworkManager Online Fix:** The script injects `/etc/NetworkManager/conf.d/20-connectivity.conf` pointing to `archive.ubuntu.com` and shifts `netplan` to NetworkManager rendering, ensuring the Software Updates tab always registers as "Online".
-3. **IPMI Proxy Wrapper:** A custom `ipmitool` bash wrapper dynamically proxies IPMI sensor and FRU requests over LAN to the baremetal Proxmox host. A strict timeout was added to this wrapper to prevent unresponsive IPMI commands from hanging the installation process.
+3. **Hardware Override Validation:** The script bypasses hardware dependencies by spoofing the sensors natively on the Proxmox host.
 4. **Python & JSON Hardware Overrides:** The script uses `jq` to explicitly set `"Edit Mode": true` and `"VM": false` in `server_info.json`. It also patches the `server_identifier` Python code to prevent it from overwriting the fake physical chassis. This forces the Vue.js frontend to render a complete, uncropped physical chassis based on the exact chassis string selected during installation.
 5. **Custom Branding:** Injected SVG vector graphics and CSS to apply the Van Auken Tech theme to the Cockpit login screen.
 

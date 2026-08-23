@@ -14,7 +14,7 @@ The Van Auken Tech Houston UI is a powerful, centralized management dashboard ta
 ### 45Drives Disks
 *   **Purpose:** Provides a physical 2D layout of your server chassis (e.g., Storinator S45).
 *   **Usage:** Navigate to this tab to see the health and location of your physical drives. Empty bays will appear dark, while populated bays will light up.
-*   **Virtual Machines:** When deployed in a Proxmox VM with HBA pass-through and IPMI Proxy enabled, the interface natively reads the bare-metal FRU data to render the full physical chassis layout perfectly un-cropped.
+*   **Virtual Machines:** When deployed in a Proxmox VM with HBA pass-through, the interface applies hardware spoofing to render the full physical chassis layout perfectly un-cropped.
 
 ### ZFS Storage Management
 *   **Purpose:** Create, manage, and monitor ZFS pools and datasets.

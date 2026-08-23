@@ -61,6 +61,10 @@ BANNER
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 
+if [ -f /etc/os-release ]; then
+    source /etc/os-release
+fi
+
 header_info
 
 if [[ $EUID -ne 0 ]]; then
@@ -110,18 +114,6 @@ if [[ "$ENV_TYPE" == "VM" ]]; then
         HW_MODEL="Storinator-$HW_CHASSIS"
     fi
     log "Configured VM Hardware Spoofing: Model=$HW_MODEL, Chassis=$HW_CHASSIS"
-
-    # Ask if we should proxy IPMI
-    if whiptail --title "IPMI Configuration" --yesno "Would you like to configure an IPMI Proxy to a physical Proxmox host for this VM? (Allows baremetal sensor passthrough)" 10 70; then
-        IPMI_PROXY="YES"
-        IPMI_HOST=$(whiptail --title "IPMI Configuration" --inputbox "Enter the IP address of the physical IPMI host:" 10 60 3>&1 1>&2 2>&3)
-        IPMI_USER=$(whiptail --title "IPMI Configuration" --inputbox "Enter the IPMI username:" 10 60 3>&1 1>&2 2>&3)
-        IPMI_PASS=$(whiptail --title "IPMI Configuration" --passwordbox "Enter the IPMI password:" 10 60 3>&1 1>&2 2>&3)
-        log "IPMI Proxy Enabled for $IPMI_HOST"
-    else
-        IPMI_PROXY="NO"
-        log "IPMI Proxy Disabled"
-    fi
 fi
 
 section "Installing 45Drives Repository"
@@ -133,7 +125,7 @@ wget -qO - https://repo.45drives.com/key/gpg.asc | gpg --pinentry-mode loopback 
 echo "deb [signed-by=/usr/share/keyrings/45drives-archive-keyring.gpg] https://repo.45drives.com/enterprise/ubuntu jammy main" > /etc/apt/sources.list.d/45drives-enterprise-jammy.list
 
 msg_info "Setting apt preferences for 45Drives repo"
-if [[ "$OS_ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]]; then
+if [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]]; then
     # Strict pinning for 24.04 to force OS-native ZFS and Samba
     cat <<PREF > /etc/apt/preferences.d/45drives.pref
 Package: cockpit* 45drives-tools
@@ -180,28 +172,21 @@ msg_ok "NetworkManager configured"
 
 section "Configuring Environment"
 if [[ "$ENV_TYPE" == "VM" ]]; then
-msg_info "Bridging VM to Physical Host via IPMI Proxy"
-    # Install ipmitool to query the bare metal host sensors and FRU
-    apt-get install -y -qq ipmitool >> "$LOGFILE" 2>&1
-    if [ -f /usr/bin/ipmitool ]; then
-        mv /usr/bin/ipmitool /usr/bin/ipmitool.real
-        cat << 'WRAPPER' > /usr/bin/ipmitool
-#!/bin/bash
-# Natively route all IPMI calls from the VM to the physical Proxmox host
-exec /usr/bin/ipmitool.real -I lanplus -H 192.168.200.136 -U tvanauken -P VanAwsome1 "$@"
-WRAPPER
-        chmod +x /usr/bin/ipmitool
-    fi
-    msg_ok "Configured IPMI Proxy to Physical Host"
-    
     msg_info "Applying VM Hardware Overrides"
     mkdir -p /etc/45drives/server_info/
     
-
-    
     if [ -f /etc/45drives/server_info/server_info.json ]; then
-        # Set VM to false so the UI renders fully, and strictly enforce the S45 model to avoid UI parsing crashes
-        jq '.Model = "Storinator-S45" | .VM = false | ."Edit Mode" = true' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
+        # Set VM to false so the UI renders fully, and enforce the chosen model to avoid UI parsing crashes
+        jq '.Model = "'"$HW_MODEL"'" | .VM = false | ."Edit Mode" = true' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
+    else
+        # Create it if it doesn't exist yet so the hardware spoofing is applied
+        cat <<EOF > /etc/45drives/server_info/server_info.json
+{
+  "Model": "$HW_MODEL",
+  "VM": false,
+  "Edit Mode": true
+}
+EOF
     fi
     
     # Patch the underlying Python script so it stops aggressively resetting the VM flag
@@ -210,12 +195,6 @@ WRAPPER
         sed -i 's/def vm_passthrough(server):/def vm_passthrough(server):\n\tpass\n\ndef old_vm_passthrough(server):/' /opt/45drives/tools/server_identifier
     fi
     msg_ok "Applied VM hardware overrides"
-
-    msg_info "Masking OpenIPMI (VM Environment)"
-    systemctl disable --now openipmi >> "$LOGFILE" 2>&1 || true
-    systemctl mask openipmi >> "$LOGFILE" 2>&1 || true
-    systemctl reset-failed >> "$LOGFILE" 2>&1 || true
-    msg_ok "Masked OpenIPMI service"
 fi
 
 msg_info "Allowing root login to Cockpit UI"
