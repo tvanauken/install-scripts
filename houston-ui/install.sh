@@ -179,7 +179,7 @@ msg_info "Bridging VM to Physical Host via IPMI Proxy"
         cat << 'WRAPPER' > /usr/bin/ipmitool
 #!/bin/bash
 # Natively route all IPMI calls from the VM to the physical Proxmox host
-exec /usr/bin/ipmitool.real -I lanplus -H 192.168.200.136 -U tvanauken -P VanAwsome1 "\$@"
+exec /usr/bin/ipmitool.real -I lanplus -H 192.168.200.136 -U tvanauken -P VanAwsome1 "$@"
 WRAPPER
         chmod +x /usr/bin/ipmitool
     fi
