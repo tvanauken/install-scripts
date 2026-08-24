@@ -148,7 +148,7 @@ msg_ok "45Drives repository added and pinned"
 
 section "Installing Packages"
 msg_info "Installing dependencies and Houston UI"
-PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server podman cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser cockpit-machines cockpit-podman 45drives-tools"
+PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser 45drives-tools"
 if [[ "$VERSION_ID" == "24.04" ]]; then
     PACKAGES="$PACKAGES cockpit-super-simple-setup"
 fi
