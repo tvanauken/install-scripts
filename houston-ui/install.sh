@@ -2,17 +2,17 @@
 # ============================================================================
 #  Van Auken Tech Houston UI & Cockpit Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    1.0.0
-#  Date:       2026-08-22
+#  Version:    6.0.0
+#  Date:       2026-08-24
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
 
 # ── Colour Palette ────────────────────────────────────────────────────────────
-RD="\033[01;31m"
-YW="\033[33m"
-GN="\033[1;92m"
-DGN="\033[32m"
-BL="\033[36m"
+RD="\033[38;5;131m"    # Muted Red (Error)
+YW="\033[38;5;137m"    # Muted Yellow (Warning)
+GN="\033[38;5;108m"    # Muted Green (Success)
+DGN="\033[38;5;67m"    # Steel Blue (Headers)
+BL="\033[38;5;110m"    # Light Blue Gray (Info)
 CL="\033[m"
 BLD="\033[1m"
 TAB="    "
@@ -110,8 +110,10 @@ if [[ "$ENV_TYPE" == "VM" ]]; then
 # Set Model name based on chassis
     if [[ "$HW_CHASSIS" == "HL15" || "$HW_CHASSIS" == "HL8" ]]; then
         HW_MODEL="HomeLab-$HW_CHASSIS"
+        ALIAS_STYLE="HOMELAB"
     else
         HW_MODEL="Storinator-$HW_CHASSIS"
+        ALIAS_STYLE="STORINATOR"
     fi
     log "Configured VM Hardware Spoofing: Model=$HW_MODEL, Chassis=$HW_CHASSIS"
 fi
@@ -153,48 +155,44 @@ fi
 apt-get install -y -qq $PACKAGES >> "$LOGFILE" 2>&1
 msg_ok "Packages installed successfully"
 
-section "Configuring Networking"
-msg_info "Enabling NetworkManager Connectivity Checks"
-cat << 'NCONF' > /etc/NetworkManager/conf.d/20-connectivity.conf
-[connectivity]
-uri=http://archive.ubuntu.com/ubuntu/
-interval=300
-NCONF
-
-# Reconfigure NetworkManager if disabled
-if grep -q "managed=false" /etc/NetworkManager/NetworkManager.conf; then
-    sed -i 's/managed=false/managed=true/' /etc/NetworkManager/NetworkManager.conf
-fi
-
-systemctl restart NetworkManager >> "$LOGFILE" 2>&1 || true
-msg_ok "NetworkManager configured"
-
-
 section "Configuring Environment"
 if [[ "$ENV_TYPE" == "VM" ]]; then
     msg_info "Applying VM Hardware Overrides"
     mkdir -p /etc/45drives/server_info/
     
     if [ -f /etc/45drives/server_info/server_info.json ]; then
-        # Set VM to false so the UI renders fully, and enforce the chosen model to avoid UI parsing crashes
-        jq '.Model = "'"$HW_MODEL"'" | .VM = false | ."Edit Mode" = true' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
+        # Ensure Edit Mode is false so dynamic scanning works, but spoofing is forced by python patch
+        jq '.Model = "'"$HW_MODEL"'" | .VM = false | ."Edit Mode" = false' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
     else
-        # Create it if it doesn't exist yet so the hardware spoofing is applied
+        # Create it if it doesn't exist yet
         cat <<EOF > /etc/45drives/server_info/server_info.json
 {
   "Model": "$HW_MODEL",
   "VM": false,
-  "Edit Mode": true
+  "Edit Mode": false
 }
 EOF
     fi
     
-    # Patch the underlying Python script so it stops aggressively resetting the VM flag
+    # Patch the underlying Python script to spoof the chassis layout and avoid QEMU generic fallback
     if [ -f /opt/45drives/tools/server_identifier ]; then
-        sed -i 's/server\["VM"\] = vm_check(server\["Motherboard"\])/server["VM"] = False/' /opt/45drives/tools/server_identifier
+        sed -i 's/server\["VM"\] = vm_check(server\["Motherboard"\])/server\["VM"\] = False/' /opt/45drives/tools/server_identifier
         sed -i 's/def vm_passthrough(server):/def vm_passthrough(server):\n\tpass\n\ndef old_vm_passthrough(server):/' /opt/45drives/tools/server_identifier
+        
+        # Inject dynamic spoofing lines right before update_json_file
+        if ! grep -q "server\[\"Model\"\] = \"$HW_MODEL\"" /opt/45drives/tools/server_identifier; then
+            sed -i '/update_json_file(server,scan_time)/i \
+\tserver["Model"] = "'"$HW_MODEL"'"\
+\tserver["Chassis Size"] = "'"$HW_CHASSIS"'"\
+\tserver["Alias Style"] = "'"$ALIAS_STYLE"'"' /opt/45drives/tools/server_identifier
+        fi
     fi
     msg_ok "Applied VM hardware overrides"
+
+    msg_info "Disabling libvirt default network (VM Environment)"
+    virsh net-destroy default >/dev/null 2>&1 || true
+    virsh net-autostart --disable default >/dev/null 2>&1 || true
+    msg_ok "Disabled virbr0"
 fi
 
 msg_info "Allowing root login to Cockpit UI"

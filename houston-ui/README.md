@@ -10,6 +10,8 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 ## Documentation
 * [User Manual](docs/user-manual.md)
+* [Reference Manual](docs/reference-manual.md)
+* [Engineering Manual](docs/engineering-manual.md)
 * [Build Log](docs/build-log.md)
 
 ---
