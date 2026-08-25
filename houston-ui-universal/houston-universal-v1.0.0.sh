@@ -150,10 +150,10 @@ msg_ok "45Drives repository added and pinned"
 section "Installing Packages"
 msg_info "Sanitizing Unwanted Packages"
 # Ensure incompatible components are removed
-apt-get remove -y --purge modemmanager wpasupplicant network-manager-gnome network-manager-pptp >> "$LOGFILE" 2>&1 || true
+apt-get remove -y --purge network-manager network-manager-gnome network-manager-pptp modemmanager wpasupplicant cockpit-networkmanager >> "$LOGFILE" 2>&1 || true
 
 msg_info "Installing dependencies and Houston UI"
-PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser 45drives-tools network-manager cockpit-networkmanager"
+PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser 45drives-tools"
 
 if [[ "$VER_NUM" -ge 2404 ]]; then
     PACKAGES="$PACKAGES cockpit-super-simple-setup"
@@ -282,24 +282,6 @@ CSS1
 msg_ok "Applied Van Auken Tech Custom Branding"
 
 
-
-msg_info "Configuring Netplan for NetworkManager (Cockpit UI Compatibility)"
-if [ -d /etc/netplan ]; then
-    # Ensure NetworkManager is the default renderer so Cockpit's Networking tab populates correctly
-    cat <<NETPLAN > /etc/netplan/01-network-manager-all.yaml
-network:
-  version: 2
-  renderer: NetworkManager
-NETPLAN
-    netplan apply >> "$LOGFILE" 2>&1 || true
-fi
-msg_ok "Netplan configured for NetworkManager"
-
-msg_info "Applying PackageKit Offline Workaround (Cockpit Bug #16963)"
-# On Ubuntu Server (which uses networkd), PackageKit queries NetworkManager for online status.
-# Because NetworkManager manages nothing, PackageKit thinks the system is offline and refuses to update.
-nmcli con add type dummy con-name fake ifname fake0 ip4 1.2.3.4/24 gw4 1.2.3.1 >> "$LOGFILE" 2>&1 || true
-msg_ok "PackageKit dummy interface created"
 
 msg_info "Restarting Cockpit service"
 systemctl enable --now cockpit.socket >> "$LOGFILE" 2>&1
