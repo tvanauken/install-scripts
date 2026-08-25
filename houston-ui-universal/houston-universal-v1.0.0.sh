@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  Van Auken Tech - Houston / 45Drives - Universal Installer & Cockpit Installer
+#  Van Auken Tech - Houston / 45Drives - Universal Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
 #  Version:    1.0.0
-#  Date:       2026-08-24
+#  Date:       $(date +%Y-%m-%d)
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
 
@@ -94,6 +94,7 @@ log "Environment Type: $ENV_TYPE"
 # If VM, ask for Model and Chassis
 HW_MODEL=""
 HW_CHASSIS=""
+ALIAS_STYLE=""
 if [[ "$ENV_TYPE" == "VM" ]]; then
     HW_CHASSIS=$(whiptail --title "Chassis Size" --menu "Select the emulated Chassis Size:" 15 60 6 \
     "S45" "Storinator S45 Turbo (45 Drives)" \
@@ -118,18 +119,24 @@ if [[ "$ENV_TYPE" == "VM" ]]; then
     log "Configured VM Hardware Spoofing: Model=$HW_MODEL, Chassis=$HW_CHASSIS"
 fi
 
+section "Sanitizing Environment"
+msg_info "Purging conflicting network and VM packages from previous states"
+apt-get remove -y --purge network-manager network-manager-gnome network-manager-pptp modemmanager wpasupplicant cockpit-networkmanager >> "$LOGFILE" 2>&1
+apt-get autoremove -y >> "$LOGFILE" 2>&1
+msg_ok "Environment sanitized"
+
 section "Installing 45Drives Repository"
 msg_info "Configuring APT Sideloading"
 
 # Import 45Drives GPG Key
 wget -qO - https://repo.45drives.com/key/gpg.asc | gpg --pinentry-mode loopback --batch --yes --dearmor -o /usr/share/keyrings/45drives-archive-keyring.gpg
-# Add the Jammy list (since Noble isn't natively supported by 45Drives yet)
+# Add the Jammy list (since newer OSes aren't natively supported by 45Drives yet)
 echo "deb [signed-by=/usr/share/keyrings/45drives-archive-keyring.gpg] https://repo.45drives.com/enterprise/ubuntu jammy main" > /etc/apt/sources.list.d/45drives-enterprise-jammy.list
 
 msg_info "Setting apt preferences for 45Drives repo"
-VER_NUM=$(echo "$VERSION_ID" | tr -d '.')
-if [[ "$ID" == "ubuntu" && "$VER_NUM" -ge 2404 ]]; then
-    # Strict pinning for 24.04 to force OS-native ZFS and Samba
+MAJOR_VER=$(echo "$VERSION_ID" | cut -d. -f1)
+if [[ "$ID" == "ubuntu" && "$MAJOR_VER" -ge 24 ]]; then
+    # Strict pinning for 24.04/26.04+ to force OS-native ZFS and Samba
     cat <<PREF > /etc/apt/preferences.d/45drives.pref
 Package: cockpit* 45drives-tools
 Pin: origin "repo.45drives.com"
@@ -148,28 +155,48 @@ apt-get update -y -qq >> "$LOGFILE" 2>&1
 msg_ok "45Drives repository added and pinned"
 
 section "Installing Packages"
-msg_info "Sanitizing Unwanted Packages"
-# Ensure incompatible components are removed
-apt-get remove -y --purge network-manager network-manager-gnome network-manager-pptp modemmanager wpasupplicant cockpit-networkmanager >> "$LOGFILE" 2>&1 || true
-
 msg_info "Installing dependencies and Houston UI"
 PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser 45drives-tools"
 
-if [[ "$VER_NUM" -ge 2404 ]]; then
-    PACKAGES="$PACKAGES cockpit-super-simple-setup"
+if [[ "$ENV_TYPE" == "BAREMETAL" ]]; then
+    PACKAGES="$PACKAGES cockpit-machines cockpit-podman podman"
+elif [[ "$ENV_TYPE" == "VM" ]]; then
+    msg_info "Purging nested virtualization plugins (VM Environment)"
+    apt-get remove -y --purge cockpit-machines cockpit-podman podman libvirt-daemon-system libvirt-clients >> "$LOGFILE" 2>&1 || true
+    msg_ok "Virtualization plugins purged"
 fi
 
-# Apply BAREMETAL vs VM logic
-if [[ "$ENV_TYPE" == "BAREMETAL" ]]; then
-    PACKAGES="$PACKAGES cockpit-machines cockpit-podman podman libvirt-daemon-system libvirt-clients"
-else
-    # For VM, ensure virtualization networking doesn't create nested routing issues
-    apt-get remove -y --purge cockpit-machines cockpit-podman podman libvirt-daemon-system libvirt-clients >> "$LOGFILE" 2>&1 || true
+if [[ "$MAJOR_VER" -ge 24 ]]; then
+    PACKAGES="$PACKAGES cockpit-super-simple-setup"
 fi
 
 apt-get install -y -qq $PACKAGES >> "$LOGFILE" 2>&1
 msg_ok "Packages installed successfully"
 
+section "Configuring Networking"
+msg_info "Enabling native systemd-networkd rendering"
+rm -f /etc/NetworkManager/conf.d/20-connectivity.conf
+if [ -f /etc/NetworkManager/NetworkManager.conf ]; then
+    sed -i 's/managed=true/managed=false/' /etc/NetworkManager/NetworkManager.conf
+fi
+sed -i '/renderer: NetworkManager/d' /etc/netplan/*.yaml 2>/dev/null || true
+netplan apply >> "$LOGFILE" 2>&1 || true
+systemctl enable --now systemd-networkd >> "$LOGFILE" 2>&1 || true
+systemctl restart systemd-networkd >> "$LOGFILE" 2>&1 || true
+msg_ok "Native systemd-networkd restored"
+
+msg_info "Fixing systemd-udev-settle race condition for ZFS (Forward Compatible)"
+# OpenZFS upstream removed udev-settle dependencies. Older versions (like 2.1.5 in Ubuntu 22.04/24.04) 
+# still require it, which causes 120s boot hangs when passed-through HBAs take time to spin up.
+# We dynamically find any ZFS service requiring this deprecated target and surgically remove the dependency.
+for zfs_service_path in $(grep -l "systemd-udev-settle.service" /lib/systemd/system/zfs-*.service 2>/dev/null); do
+    zfs_service=$(basename "$zfs_service_path")
+    cp "$zfs_service_path" "/etc/systemd/system/${zfs_service}"
+    sed -i 's/^Requires=systemd-udev-settle.service/#Requires=systemd-udev-settle.service/' "/etc/systemd/system/${zfs_service}"
+    sed -i 's/^After=systemd-udev-settle.service/#After=systemd-udev-settle.service/' "/etc/systemd/system/${zfs_service}"
+done
+systemctl daemon-reload >> "$LOGFILE" 2>&1
+msg_ok "ZFS udev-settle dependencies dynamically resolved"
 
 section "Configuring Environment"
 if [[ "$ENV_TYPE" == "VM" ]]; then
@@ -178,29 +205,29 @@ if [[ "$ENV_TYPE" == "VM" ]]; then
     
     if [ -f /etc/45drives/server_info/server_info.json ]; then
         # Ensure Edit Mode is false so dynamic scanning works, but spoofing is forced by python patch
-        jq '.Model = "'"$HW_MODEL"'" | .VM = false | ."Edit Mode" = false' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
+        jq '.Model = "'\"$HW_MODEL\"'" | .VM = false | ."Edit Mode" = false' /etc/45drives/server_info/server_info.json > /tmp/server_info.json && mv /tmp/server_info.json /etc/45drives/server_info/server_info.json
     else
         # Create it if it doesn't exist yet
-        cat <<EOF > /etc/45drives/server_info/server_info.json
+        cat <<JSONEOF > /etc/45drives/server_info/server_info.json
 {
   "Model": "$HW_MODEL",
   "VM": false,
   "Edit Mode": false
 }
-EOF
+JSONEOF
     fi
     
     # Patch the underlying Python script to spoof the chassis layout and avoid QEMU generic fallback
     if [ -f /opt/45drives/tools/server_identifier ]; then
-        sed -i 's/server\["VM"\] = vm_check(server\["Motherboard"\])/server\["VM"\] = False/' /opt/45drives/tools/server_identifier
+        sed -i 's/server\["VM"\] = vm_check(server\["Motherboard"\])/server["VM"] = False/' /opt/45drives/tools/server_identifier
         sed -i 's/def vm_passthrough(server):/def vm_passthrough(server):\n\tpass\n\ndef old_vm_passthrough(server):/' /opt/45drives/tools/server_identifier
         
         # Inject dynamic spoofing lines right before update_json_file
         if ! grep -q "server\[\"Model\"\] = \"$HW_MODEL\"" /opt/45drives/tools/server_identifier; then
             sed -i '/update_json_file(server,scan_time)/i \
-\tserver["Model"] = "'"$HW_MODEL"'"\
-\tserver["Chassis Size"] = "'"$HW_CHASSIS"'"\
-\tserver["Alias Style"] = "'"$ALIAS_STYLE"'"' /opt/45drives/tools/server_identifier
+\tserver["Model"] = "'\"$HW_MODEL\"'"\
+\tserver["Chassis Size"] = "'\"$HW_CHASSIS\"'"\
+\tserver["Alias Style"] = "'\"$ALIAS_STYLE\"'"' /opt/45drives/tools/server_identifier
         fi
     fi
     msg_ok "Applied VM hardware overrides"
@@ -280,7 +307,6 @@ body.login-pf {
 }
 CSS1
 msg_ok "Applied Van Auken Tech Custom Branding"
-
 
 
 msg_info "Restarting Cockpit service"

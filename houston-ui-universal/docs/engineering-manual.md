@@ -1,29 +1,15 @@
-# Van Auken Tech - Houston / 45Drives - Universal Installer - Build & Validation Log
+# Van Auken Tech - Houston / 45Drives - Universal Installer - Engineering Manual
 
-## Engineering Summary
-This document logs the development, refinement, and final validation of the `houston-universal-v1.0.0.sh` script (v1.0.0 (Universal)) used to deploy the Van Auken Tech - Houston / 45Drives - Universal Installer onto Universal systems.
+## Installer Architecture (V1.0.0 Universal)
+This engineering manual outlines the critical infrastructure logic implemented in the `houston-universal-v1.0.0.sh` script.
 
-### The Challenge
-1. **OS Compatibility:** 45Drives officially supports Ubuntu 20.04 and 22.04. Ubuntu 24.04 (Noble Numbat) introduces newer native libraries (such as `samba` and `libldb2`) that conflict with the 45Drives `jammy` repositories.
-2. **Network Protocol Stability:** Ubuntu 24.04 Server utilizes `systemd-networkd` by default. Previous iterations attempted to force `NetworkManager` for GUI compatibility, which caused catastrophic timeouts during `systemd` boot sequences when waiting for storage arrays to spin up.
-3. **VM Hardware Spoofing & IOMMU Passthrough:** When deploying inside a Proxmox VM with an HBA passed through, the `45drives-disks` module's Python backend (`lsdev`) would crash or crop the 2D chassis graphic because the virtual QEMU motherboard lacks IPMI sensors and physical DMI data. Hardcoding the JSON file broke dynamic PCI bus scanning, preventing future HBA upgrades from being detected automatically.
+### 1. Dynamic Hardware Spoofing
+The Houston UI Disk management tab relies on a Python backend (`/opt/45drives/tools/server_identifier`) to cross-reference `lspci` outputs against a known database of 45Drives physical chassis layouts.
+* Because the QEMU motherboard lacks the IPMI/FRU identifiers of physical Storinators, the script would normally overwrite `server_info.json` with a generic fallback that crashes the GUI grid.
+* Instead of permanently locking the JSON file (which breaks future PCI scanning), the installer dynamically injects `sed` patches directly into the Python execution flow. It allows the script to scan the bus, but intercepts the write function to hardcode the requested chassis variables.
 
-### The Solution (V6 Implementation)
-1. **Strict APT Pinning:** The script injects `/etc/apt/preferences.d/45drives.pref` with a priority of `1000` for `cockpit-*` packages, forcing the UI to pull from 45Drives, while explicitly dropping priority for all other packages to `-1`. This allows Ubuntu 24.04 to use its native, stable backend dependencies (`samba`, `zfsutils-linux`).
-2. **Native Networkd Enforcement:** The installer permanently abolishes `NetworkManager` manipulation. The system relies purely on native `systemd-networkd` configurations, ensuring zero boot hangs or race conditions during the initial IP allocation phase.
-3. **Dynamic VM Hardware Spoofing (Python Patching):** The script dynamically patches the core `/opt/45drives/tools/server_identifier` script. It permanently leaves `/etc/45drives/server_info/server_info.json` in `"Edit Mode": false`. When the system boots, the script naturally scans the isolated IOMMU PCI bus to detect LSI HBAs and connected drives. Right before writing the JSON file, the Python injection forcefully overwrites the QEMU motherboard generic fallback with the exact requested 45Drives chassis model (e.g., `Storinator-S45`). This guarantees future HBA expansions are discovered natively without breaking the 2D chassis UI.
-4. **Libvirt Bridge Destruction:** When installed as a VM, the script automatically destroys and disables the `virbr0` default network bridge spawned by `cockpit-machines` dependencies, removing clutter from the networking tab.
-5. **Blue-Gray Aesthetic Theme:** Replaced default installer colors with a professional, highly visible Blue-Gray palette. Custom SVG branding applies the Van Auken Tech logo and background to the Cockpit login screen.
+### 2. NetworkManager Elimination
+NetworkManager creates race conditions when managing virtualized storage bridges or virtual NICs under Proxmox. The script purges all NetworkManager packages. This guarantees that `systemd-networkd` remains the sole routing authority, ensuring deterministic boots.
 
-### Validation Audit Results
-The script was executed and validated on the `regulus` environment (`192.168.200.140`), an Ubuntu 24.04 VM with an LSI 9305-16i HBA passed through.
-
-*   **[PASS]** `systemctl is-system-running` -> running (No maintenance mode drops).
-*   **[PASS]** `systemctl is-active systemd-networkd` -> active.
-*   **[PASS]** `findmnt /boot` -> Mounted natively without udev timeouts.
-*   **[PASS]** `/usr/share/cockpit/45drives-disks/scripts/disk_info` -> Parsed without Python exceptions; output dynamically built the 15-drive array from the PCIe bus scan and applied the `S45` map.
-*   **[PASS]** ZFS Boot Race Condition -> Surgically stripped deprecated `systemd-udev-settle.service` dependencies from OpenZFS unit files dynamically, preventing 120-second timeouts.
-*   **[PASS]** ZFS Functionality -> `zpool status` showed `testpool` ONLINE across reboots.
-
----
-*Created and maintained by Thomas Van Auken - Van Auken Tech.*
+### 3. ZFS systemd-udev-settle Bypass
+OpenZFS unit files in some distributions depend on `systemd-udev-settle.service`, which is deprecated and waits indefinitely for hardware queues to flush. When passing through physical HBAs, this causes 120+ second boot delays or maintenance mode drops. The installer surgically removes this dependency from all ZFS unit files.
