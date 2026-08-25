@@ -2,7 +2,7 @@
 # ============================================================================
 #  Van Auken Tech - Houston / 45Drives - Universal Installer & Cockpit Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    6.0.0
+#  Version:    1.0.0
 #  Date:       2026-08-24
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -51,7 +51,7 @@ header_info() {
      \_/ \__,_|_| |_| /_/   \_\__,_|_|\_\___|_| |_|   |_|\___|\___|_| |_|
 BANNER
   echo -e "${CL}"
-  echo -e "${DGN}  ── Van Auken Tech - Houston / 45Drives - Universal Installer Installer ───────────────────────────────────${CL}"
+  echo -e "${DGN}  ── Van Auken Tech - Houston / 45Drives - Universal Installer ───────────────────────────────────${CL}"
   printf "  ${DGN}Host   :${CL}  ${BL}%s${CL}\n" "$(hostname -f 2>/dev/null || hostname)"
   printf "  ${DGN}Date   :${CL}  ${BL}%s${CL}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
   printf "  ${DGN}Log    :${CL}  ${BL}%s${CL}\n" "$LOGFILE"
@@ -127,7 +127,8 @@ wget -qO - https://repo.45drives.com/key/gpg.asc | gpg --pinentry-mode loopback 
 echo "deb [signed-by=/usr/share/keyrings/45drives-archive-keyring.gpg] https://repo.45drives.com/enterprise/ubuntu jammy main" > /etc/apt/sources.list.d/45drives-enterprise-jammy.list
 
 msg_info "Setting apt preferences for 45Drives repo"
-if [[ "$ID" == "ubuntu" && "$VERSION_ID" == "24.04" ]]; then
+VER_NUM=$(echo "$VERSION_ID" | tr -d '.')
+if [[ "$ID" == "ubuntu" && "$VER_NUM" -ge 2404 ]]; then
     # Strict pinning for 24.04 to force OS-native ZFS and Samba
     cat <<PREF > /etc/apt/preferences.d/45drives.pref
 Package: cockpit* 45drives-tools
@@ -147,13 +148,28 @@ apt-get update -y -qq >> "$LOGFILE" 2>&1
 msg_ok "45Drives repository added and pinned"
 
 section "Installing Packages"
+msg_info "Sanitizing Unwanted Packages"
+# Ensure incompatible components are removed
+apt-get remove -y --purge modemmanager wpasupplicant network-manager-gnome network-manager-pptp >> "$LOGFILE" 2>&1 || true
+
 msg_info "Installing dependencies and Houston UI"
-PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser 45drives-tools"
-if [[ "$VERSION_ID" == "24.04" ]]; then
+PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser 45drives-tools network-manager cockpit-networkmanager"
+
+if [[ "$VER_NUM" -ge 2404 ]]; then
     PACKAGES="$PACKAGES cockpit-super-simple-setup"
 fi
+
+# Apply BAREMETAL vs VM logic
+if [[ "$ENV_TYPE" == "BAREMETAL" ]]; then
+    PACKAGES="$PACKAGES cockpit-machines cockpit-podman podman libvirt-daemon-system libvirt-clients"
+else
+    # For VM, ensure virtualization networking doesn't create nested routing issues
+    apt-get remove -y --purge cockpit-machines cockpit-podman podman libvirt-daemon-system libvirt-clients >> "$LOGFILE" 2>&1 || true
+fi
+
 apt-get install -y -qq $PACKAGES >> "$LOGFILE" 2>&1
 msg_ok "Packages installed successfully"
+
 
 section "Configuring Environment"
 if [[ "$ENV_TYPE" == "VM" ]]; then
@@ -265,6 +281,25 @@ body.login-pf {
 CSS1
 msg_ok "Applied Van Auken Tech Custom Branding"
 
+
+
+msg_info "Configuring Netplan for NetworkManager (Cockpit UI Compatibility)"
+if [ -d /etc/netplan ]; then
+    # Ensure NetworkManager is the default renderer so Cockpit's Networking tab populates correctly
+    cat <<NETPLAN > /etc/netplan/01-network-manager-all.yaml
+network:
+  version: 2
+  renderer: NetworkManager
+NETPLAN
+    netplan apply >> "$LOGFILE" 2>&1 || true
+fi
+msg_ok "Netplan configured for NetworkManager"
+
+msg_info "Applying PackageKit Offline Workaround (Cockpit Bug #16963)"
+# On Ubuntu Server (which uses networkd), PackageKit queries NetworkManager for online status.
+# Because NetworkManager manages nothing, PackageKit thinks the system is offline and refuses to update.
+nmcli con add type dummy con-name fake ifname fake0 ip4 1.2.3.4/24 gw4 1.2.3.1 >> "$LOGFILE" 2>&1 || true
+msg_ok "PackageKit dummy interface created"
 
 msg_info "Restarting Cockpit service"
 systemctl enable --now cockpit.socket >> "$LOGFILE" 2>&1

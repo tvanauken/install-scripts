@@ -1,7 +1,7 @@
 # Van Auken Tech - Houston / 45Drives - Universal Installer - Build & Validation Log
 
 ## Engineering Summary
-This document logs the development, refinement, and final validation of the `houston-universal-v1.0.0.sh` script (v6.0.0) used to deploy the Van Auken Tech - Houston / 45Drives - Universal Installer onto Universal systems.
+This document logs the development, refinement, and final validation of the `houston-universal-v1.0.0.sh` script (v1.0.0 (Universal)) used to deploy the Van Auken Tech - Houston / 45Drives - Universal Installer onto Universal systems.
 
 ### The Challenge
 1. **OS Compatibility:** 45Drives officially supports Ubuntu 20.04 and 22.04. Ubuntu 24.04 (Noble Numbat) introduces newer native libraries (such as `samba` and `libldb2`) that conflict with the 45Drives `jammy` repositories.
@@ -22,6 +22,7 @@ The script was executed and validated on the `regulus` environment (`192.168.200
 *   **[PASS]** `systemctl is-active systemd-networkd` -> active.
 *   **[PASS]** `findmnt /boot` -> Mounted natively without udev timeouts.
 *   **[PASS]** `/usr/share/cockpit/45drives-disks/scripts/disk_info` -> Parsed without Python exceptions; output dynamically built the 15-drive array from the PCIe bus scan and applied the `S45` map.
+*   **[PASS]** ZFS Boot Race Condition -> Surgically stripped deprecated `systemd-udev-settle.service` dependencies from OpenZFS unit files dynamically, preventing 120-second timeouts.
 *   **[PASS]** ZFS Functionality -> `zpool status` showed `testpool` ONLINE across reboots.
 
 ---
