@@ -266,6 +266,18 @@ CSS1
 msg_ok "Applied Van Auken Tech Custom Branding"
 
 
+
+msg_info "Fixing systemd-udev-settle race condition for ZFS"
+for zfs_service in zfs-import-cache.service zfs-load-module.service zfs-import-scan.service; do
+    if [ -f "/lib/systemd/system/${zfs_service}" ]; then
+        cp "/lib/systemd/system/${zfs_service}" "/etc/systemd/system/${zfs_service}"
+        sed -i 's/^Requires=systemd-udev-settle.service/#Requires=systemd-udev-settle.service/' "/etc/systemd/system/${zfs_service}"
+        sed -i 's/^After=systemd-udev-settle.service/#After=systemd-udev-settle.service/' "/etc/systemd/system/${zfs_service}"
+    fi
+done
+systemctl daemon-reload >> "$LOGFILE" 2>&1
+msg_ok "ZFS udev-settle dependency resolved"
+
 msg_info "Restarting Cockpit service"
 systemctl enable --now cockpit.socket >> "$LOGFILE" 2>&1
 systemctl restart cockpit >> "$LOGFILE" 2>&1
