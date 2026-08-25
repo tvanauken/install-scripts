@@ -2,7 +2,7 @@
 # ============================================================================
 #  Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer & Cockpit Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    6.0.0
+#  Version:    6.2.0
 #  Date:       2026-08-24
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -118,6 +118,12 @@ if [[ "$ENV_TYPE" == "VM" ]]; then
     log "Configured VM Hardware Spoofing: Model=$HW_MODEL, Chassis=$HW_CHASSIS"
 fi
 
+section "Sanitizing Environment"
+msg_info "Purging conflicting network and VM packages from previous states"
+apt-get remove -y --purge network-manager network-manager-gnome network-manager-pptp modemmanager wpasupplicant cockpit-networkmanager >> "$LOGFILE" 2>&1
+apt-get autoremove -y >> "$LOGFILE" 2>&1
+msg_ok "Environment sanitized"
+
 section "Installing 45Drives Repository"
 msg_info "Configuring APT Sideloading"
 
@@ -149,15 +155,50 @@ msg_ok "45Drives repository added and pinned"
 section "Installing Packages"
 msg_info "Installing dependencies and Houston UI"
 PACKAGES="zfsutils-linux samba winbind realmd nfs-kernel-server cockpit cockpit-bridge cockpit-ws cockpit-system cockpit-45drives-hardware cockpit-file-sharing cockpit-navigator cockpit-identities cockpit-benchmark cockpit-zfs cockpit-ceph cockpit-s3-browser 45drives-tools"
+
+if [[ "$ENV_TYPE" == "BAREMETAL" ]]; then
+    PACKAGES="$PACKAGES cockpit-machines cockpit-podman podman"
+elif [[ "$ENV_TYPE" == "VM" ]]; then
+    msg_info "Purging nested virtualization plugins (VM Environment)"
+    apt-get remove -y --purge cockpit-machines cockpit-podman podman libvirt-daemon-system libvirt-clients >> "$LOGFILE" 2>&1 || true
+    msg_ok "Virtualization plugins purged"
+fi
+
 if [[ "$VERSION_ID" == "24.04" ]]; then
     PACKAGES="$PACKAGES cockpit-super-simple-setup"
 fi
+
 apt-get install -y -qq $PACKAGES >> "$LOGFILE" 2>&1
 msg_ok "Packages installed successfully"
 
+section "Configuring Networking"
+msg_info "Enabling native systemd-networkd rendering"
+rm -f /etc/NetworkManager/conf.d/20-connectivity.conf
+if [ -f /etc/NetworkManager/NetworkManager.conf ]; then
+    sed -i 's/managed=true/managed=false/' /etc/NetworkManager/NetworkManager.conf
+fi
+sed -i '/renderer: NetworkManager/d' /etc/netplan/*.yaml 2>/dev/null || true
+netplan apply >> "$LOGFILE" 2>&1 || true
+systemctl enable --now systemd-networkd >> "$LOGFILE" 2>&1 || true
+systemctl restart systemd-networkd >> "$LOGFILE" 2>&1 || true
+msg_ok "Native systemd-networkd restored"
+
 section "Configuring Environment"
 if [[ "$ENV_TYPE" == "VM" ]]; then
-    msg_info "Applying VM Hardware Overrides"
+    msg_info "Fixing systemd-udev-settle race condition for ZFS (Forward Compatible)"
+# OpenZFS upstream removed udev-settle dependencies. Older versions (like 2.1.5 in Ubuntu 22.04/24.04) 
+# still require it, which causes 120s boot hangs when passed-through HBAs take time to spin up.
+# We dynamically find any ZFS service requiring this deprecated target and surgically remove the dependency.
+for zfs_service_path in $(grep -l "systemd-udev-settle.service" /lib/systemd/system/zfs-*.service 2>/dev/null); do
+    zfs_service=$(basename "$zfs_service_path")
+    cp "$zfs_service_path" "/etc/systemd/system/${zfs_service}"
+    sed -i 's/^Requires=systemd-udev-settle.service/#Requires=systemd-udev-settle.service/' "/etc/systemd/system/${zfs_service}"
+    sed -i 's/^After=systemd-udev-settle.service/#After=systemd-udev-settle.service/' "/etc/systemd/system/${zfs_service}"
+done
+systemctl daemon-reload >> "$LOGFILE" 2>&1
+msg_ok "ZFS udev-settle dependencies dynamically resolved"
+
+msg_info "Applying VM Hardware Overrides"
     mkdir -p /etc/45drives/server_info/
     
     if [ -f /etc/45drives/server_info/server_info.json ]; then

@@ -301,12 +301,12 @@ Password: Wiicco@111!!
 
 ### 14. Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer
 **Directory:** [`houston-ui/`](houston-ui/)
-**Script:** [`houston-jammy-v6.0.0.sh`](houston-ui/houston-jammy-v6.0.0.sh)
+**Script:** [`houston-jammy-v6.2.0.sh`](houston-ui/houston-jammy-v6.2.0.sh)
 
 Installs the 45Drives Houston UI, Cockpit, and ZFS plugins. Includes specialized logic to bypass hardware identification failures when running as a VM inside Proxmox with an HBA passed through, and interactively configures the chassis size.
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/houston-jammy-v6.0.0.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/houston-jammy-v6.2.0.sh)
 ```
 
 ---

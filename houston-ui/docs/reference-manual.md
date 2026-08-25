@@ -1,7 +1,7 @@
 # Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer - Reference Manual
 
 ## Installer Architecture (V6.0.0)
-This reference manual outlines the critical infrastructure logic implemented in the `houston-jammy-v6.0.0.sh` V6 script.
+This reference manual outlines the critical infrastructure logic implemented in the `houston-jammy-v6.2.0.sh` V6 script.
 
 ### 1. Network Configuration
 * **Renderer:** `systemd-networkd`
