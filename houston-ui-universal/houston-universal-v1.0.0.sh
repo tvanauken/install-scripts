@@ -144,7 +144,7 @@ Pin-Priority: 1000
 
 Package: *
 Pin: origin "repo.45drives.com"
-Pin-Priority: -1
+Pin-Priority: 100
 PREF
 else
     # 22.04 and 20.04 require the 45Drives forks of ZFS (zfs-dkms/zfs-zed)
