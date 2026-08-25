@@ -1,7 +1,7 @@
-# Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer - User Manual
+# Van Auken Tech - Houston / 45Drives - Universal Installer - User Manual
 
 ## Overview
-The Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer is a powerful, centralized management dashboard tailored for 45Drives hardware and virtualized storage environments. It provides a robust, graphical interface for managing ZFS pools, Samba/NFS file shares, networking, and system identities, all wrapped in a custom Van Auken Tech theme.
+The Van Auken Tech - Houston / 45Drives - Universal Installer is a powerful, centralized management dashboard tailored for 45Drives hardware and virtualized storage environments. It provides a robust, graphical interface for managing ZFS pools, Samba/NFS file shares, networking, and system identities, all wrapped in a custom Van Auken Tech theme.
 
 ## Accessing the Dashboard
 1. Open a modern web browser (Chrome, Firefox, Safari).

@@ -299,14 +299,26 @@ Password: Wiicco@111!!
 
 ---
 
-### 14. Houston UI & 45Drives Installer
+### 14. Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer
 **Directory:** [`houston-ui/`](houston-ui/)
-**Script:** [`install.sh`](houston-ui/install.sh)
+**Script:** [`houston-jammy-v6.0.0.sh`](houston-ui/houston-jammy-v6.0.0.sh)
 
 Installs the 45Drives Houston UI, Cockpit, and ZFS plugins. Includes specialized logic to bypass hardware identification failures when running as a VM inside Proxmox with an HBA passed through, and interactively configures the chassis size.
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/houston-jammy-v6.0.0.sh)
+```
+
+---
+
+### 15. Van Auken Tech - Houston / 45Drives - Universal Installer
+**Directory:** [`houston-ui-universal/`](houston-ui-universal/)
+**Script:** [`houston-universal-v1.0.0.sh`](houston-ui-universal/houston-universal-v1.0.0.sh)
+
+Universal forward-compatible installer for the 45Drives Houston UI, Cockpit, and ZFS plugins.
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui-universal/houston-universal-v1.0.0.sh)
 ```
 
 ---

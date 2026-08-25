@@ -1,7 +1,7 @@
-# Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer - Build & Validation Log
+# Van Auken Tech - Houston / 45Drives - Universal Installer - Build & Validation Log
 
 ## Engineering Summary
-This document logs the development, refinement, and final validation of the `houston-jammy-v6.0.0.sh` script (v6.0.0) used to deploy the Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer onto Ubuntu 24.04 LTS - (Jammy) systems.
+This document logs the development, refinement, and final validation of the `houston-universal-v1.0.0.sh` script (v6.0.0) used to deploy the Van Auken Tech - Houston / 45Drives - Universal Installer onto Universal systems.
 
 ### The Challenge
 1. **OS Compatibility:** 45Drives officially supports Ubuntu 20.04 and 22.04. Ubuntu 24.04 (Noble Numbat) introduces newer native libraries (such as `samba` and `libldb2`) that conflict with the 45Drives `jammy` repositories.

@@ -15,10 +15,10 @@ Scripts 1–4, 10–11 target Proxmox VE hosts directly. Script 5 targets Raspbe
 ## Scripts
 | Script | Command | Description |
 |---|---|---|
-| Houston UI | `bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)` | Installs Cockpit, 45Drives modules, and custom Van Auken Tech branding. |
+| Houston UI | `bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/houston-jammy-v6.0.0.sh)` | Installs Cockpit, 45Drives modules, and custom Van Auken Tech branding. |
 | Script | Command | Description |
 |---|---|---|
-| Houston UI | `bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)` | Installs Cockpit, 45Drives modules, and custom Van Auken Tech branding. | in This Collection
+| Houston UI | `bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/houston-jammy-v6.0.0.sh)` | Installs Cockpit, 45Drives modules, and custom Van Auken Tech branding. | in This Collection
 
 | # | Script | Directory | Target | Version | Purpose |
 |---|--------|-----------|--------|---------|--------|
@@ -87,10 +87,16 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt-macos/kali-prompt-macos-install.sh)
 ```
 
-### Houston UI & 45Drives Installer
+### Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/houston-jammy-v6.0.0.sh)"
 ```
+
+### Van Auken Tech - Houston / 45Drives - Universal Installer
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui-universal/houston-universal-v1.0.0.sh)"
+```
+
 
 ---
 

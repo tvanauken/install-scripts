@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  Van Auken Tech Houston UI & Cockpit Installer
+#  Van Auken Tech - Houston / 45Drives - Universal Installer & Cockpit Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
 #  Version:    6.0.0
 #  Date:       2026-08-24
@@ -51,7 +51,7 @@ header_info() {
      \_/ \__,_|_| |_| /_/   \_\__,_|_|\_\___|_| |_|   |_|\___|\___|_| |_|
 BANNER
   echo -e "${CL}"
-  echo -e "${DGN}  ── Van Auken Tech Houston UI Installer ───────────────────────────────────${CL}"
+  echo -e "${DGN}  ── Van Auken Tech - Houston / 45Drives - Universal Installer Installer ───────────────────────────────────${CL}"
   printf "  ${DGN}Host   :${CL}  ${BL}%s${CL}\n" "$(hostname -f 2>/dev/null || hostname)"
   printf "  ${DGN}Date   :${CL}  ${BL}%s${CL}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
   printf "  ${DGN}Log    :${CL}  ${BL}%s${CL}\n" "$LOGFILE"
@@ -272,6 +272,6 @@ systemctl restart cockpit >> "$LOGFILE" 2>&1
 msg_ok "Cockpit service restarted"
 
 echo ""
-echo -e "${GN}${BLD}  Van Auken Tech Houston UI installation is complete!${CL}"
+echo -e "${GN}${BLD}  Van Auken Tech - Houston / 45Drives - Universal Installer installation is complete!${CL}"
 echo -e "${BL}  Access the dashboard at: https://$(hostname -I | awk '{print $1}'):9090${CL}"
 echo ""

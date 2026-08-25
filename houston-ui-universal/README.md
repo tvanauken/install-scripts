@@ -1,11 +1,11 @@
-# Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer
+# Van Auken Tech - Houston / 45Drives - Universal Installer
 
 This directory contains the installer for the Van Auken Tech branded Houston UI and Cockpit management system.
 
 ## Usage
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/houston-jammy-v6.0.0.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/houston-universal-v1.0.0.sh)
 ```
 
 ## Documentation
