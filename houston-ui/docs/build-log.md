@@ -1,7 +1,18 @@
 # Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer - Build & Validation Log
 
 ## Engineering Summary
-This document logs the development, refinement, and final validation of the `houston-jammy-v6.2.0.sh` script (v6.2.0) used to deploy the Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer onto Ubuntu 24.04 LTS - (Jammy) systems.
+This document logs the development, refinement, and final validation of the `houston-jammy-v6.3.0.sh` script (v6.3.0) used to deploy the Van Auken Tech - Houston / 45Drives - Ubuntu 24.04 LTS - Jammy Installer onto Ubuntu 24.04 LTS - (Jammy) systems.
+
+
+### Version History & Changelog
+*   **v6.3.0 (Current): Firmware Check Fortification & Super Simple Setup Hotfix**
+    *   *Bug Fix 1:* The `45d-firmware-check.service` crashed during automated `apt-daily-upgrade` runs due to a transient DNS lookup failure when `systemd-resolved` restarted at the same millisecond the daily timer fired. We surgically injected a `Restart=on-failure` systemd drop-in override (`RestartSec=60`) to make the check robust against transient network drops.
+    *   *Bug Fix 2:* The upstream `cockpit-super-simple-setup` (1.1.7-4jammy) package was broken. The `.deb` archive nested the files incorrectly (`/super-simple-setup/super-simple-setup/server.js`) and enforced a breaking `"type": "module"` setting in `package.json` that caused Node.js to throw a fatal ES module error and enter an infinite restart loop. We engineered a dynamic hotfix to symlink the correct path and rewrite the `package.json` to `"type": "commonjs"`.
+*   **v6.2.0: NetworkManager Eradication**
+    *   *Bug Fix:* NetworkManager was completely purged to resolve catastrophic boot hangs on Proxmox VMs waiting for unmanaged HBAs to initialize. This forces PackageKit to gracefully fallback to native `systemd-networkd`, implicitly solving the Cockpit 'offline' bug.
+*   **v6.0.0: Universal ZFS udev-settle bypass & Dynamic Hardware Spoofing**
+    *   *Bug Fix:* OpenZFS hardcoded `systemd-udev-settle` dependencies. We dynamically remove them to prevent 120s boot timeouts.
+    *   *Feature:* Dynamically sed-injected Python patches into `/opt/45drives/tools/server_identifier` to natively spoof Proxmox QEMU motherboards as physical Storinator chassis.
 
 ### The Challenge
 1. **OS Compatibility:** 45Drives officially supports Ubuntu 20.04 and 22.04. Ubuntu 24.04 (Noble Numbat) introduces newer native libraries (such as `samba` and `libldb2`) that conflict with the 45Drives `jammy` repositories.
