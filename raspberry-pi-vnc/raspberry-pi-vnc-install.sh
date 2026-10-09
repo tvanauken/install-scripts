@@ -2,7 +2,7 @@
 # ============================================================================
 #  Raspberry Pi Kali Linux — Headless VNC Multi-Session Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    1.0.6
+#  Version:    1.0.7
 #  Date:       2026-10-09
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -91,6 +91,17 @@ fi
 
 section "System Preparation"
 msg_info "Updating package lists"
+if ! log_exec apt-get update -y; then
+  msg_error "Failed to update package lists!"
+fi
+msg_ok "Package lists updated"
+
+msg_info "Validating VNC repository dependencies"
+export DEBIAN_FRONTEND=noninteractive
+if ! log_exec apt-get -s install tigervnc-standalone-server tigervnc-tools dbus-x11 xfce4 xfce4-goodies lightdm >/dev/null 2>&1; then
+  msg_error "Dependency conflict detected in OS repositories. The system cannot safely install the required packages. Please run 'sudo apt-get install tigervnc-standalone-server dbus-x11 xfce4 lightdm' manually to resolve the package conflicts before running this script."
+fi
+msg_ok "Repository dependencies validated"
 if ! log_exec apt-get update -y; then
   msg_error "Failed to update package lists!"
 fi
