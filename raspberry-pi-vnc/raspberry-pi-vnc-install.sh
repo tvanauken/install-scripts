@@ -121,7 +121,7 @@ section "Session Isolation"
 msg_info "Deploying global D-Bus / XDG isolation script"
 cat << 'INNER' > /etc/X11/Xsession.d/99-isolate-dbus-runtime
 # Isolate runtime directories so the same user can run multiple concurrent XFCE sessions
-export XDG_RUNTIME_DIR=/tmp/xdg-runtime-$(id -u)-\$\$
+export XDG_RUNTIME_DIR=/tmp/xdg-runtime-$(id -u)-$$
 mkdir -p $XDG_RUNTIME_DIR
 chmod 700 $XDG_RUNTIME_DIR
 
