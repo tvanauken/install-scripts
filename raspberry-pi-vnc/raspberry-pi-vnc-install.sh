@@ -2,7 +2,7 @@
 # ============================================================================
 #  Raspberry Pi / Debian — Headless VNC Multi-Session Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    2.0.1
+#  Version:    2.0.2
 #  Date:       2026-10-09
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -125,6 +125,12 @@ export XDG_RUNTIME_DIR=/tmp/xdg-runtime-$(id -u)-\$\$
 mkdir -p $XDG_RUNTIME_DIR
 chmod 700 $XDG_RUNTIME_DIR
 
+# Apply High-DPI scaling for readability over VNC
+export GDK_SCALE=2
+export GDK_DPI_SCALE=0.5
+export QT_AUTO_SCREEN_SCALE_FACTOR=1
+export XCURSOR_SIZE=32
+xrandr --dpi 144 >/dev/null 2>&1 || true
 # Use modern dbus-run-session to wrap the X11 launch, eliminating the need for legacy dbus-x11
 if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
     STARTUP="dbus-run-session $STARTUP"

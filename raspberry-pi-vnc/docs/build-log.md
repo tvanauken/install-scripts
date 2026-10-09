@@ -1,7 +1,7 @@
 # Raspberry Pi VNC Multi-Session Installer — Engineering Specifications
 
 **Author: Thomas Van Auken — Van Auken Tech**
-**Version: 2.0.1**
+**Version: 2.0.2**
 
 <div style="background-color: #e3f2fd; border-left: 6px solid #1976d2; padding: 15px;">
 <strong>Purpose:</strong> Complete engineering specification detailing the architecture of the headless RealVNC-compatible server deployed on Raspberry Pi (Kali/Debian/Ubuntu).
