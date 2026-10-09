@@ -2,7 +2,7 @@
 # ============================================================================
 #  Raspberry Pi Kali Linux — Headless VNC Multi-Session Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    1.0.0
+#  Version:    1.0.1
 #  Date:       2026-10-09
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
