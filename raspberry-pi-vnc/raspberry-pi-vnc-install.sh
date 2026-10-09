@@ -102,6 +102,9 @@ section "XDMCP Configuration"
 msg_info "Enabling XDMCP in LightDM"
 mkdir -p /etc/lightdm/lightdm.conf.d
 cat << 'CONF' > /etc/lightdm/lightdm.conf.d/50-xdmcp.conf
+[LightDM]
+start-default-seat=false
+
 [XDMCPServer]
 enabled=true
 port=177
