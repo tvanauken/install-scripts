@@ -29,6 +29,16 @@ cleanup() {
 trap cleanup EXIT
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
+check_os() {
+  if [[ -f /etc/os-release ]]; then
+    . /etc/os-release
+    if [[ ! "$ID" =~ ^(debian|kali|ubuntu)$ && ! "$ID_LIKE" =~ ^(debian|ubuntu)$ ]]; then
+      msg_error "Unsupported OS ($ID). This script requires Debian, Kali Linux, or Ubuntu."
+    fi
+  else
+    msg_error "/etc/os-release not found. Cannot verify OS compatibility."
+  fi
+}
 msg_info()  { printf "${TAB}${YW}◆  %s...${CL}\r" "$1"; }
 msg_ok()    { printf "${TAB}${GN}✔  %-50s${CL}\n" "$1"; }
 msg_error() { printf "${TAB}${RD}✘  %s${CL}\n" "$1"; exit 1; }
@@ -70,6 +80,7 @@ summary() {
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+check_os
 header_info
 
 if [[ $EUID -ne 0 ]]; then
