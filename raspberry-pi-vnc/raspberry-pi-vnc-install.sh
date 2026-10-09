@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ============================================================================
-#  Raspberry Pi Kali Linux — Headless VNC Multi-Session Installer
+#  Raspberry Pi / Debian — Headless VNC Multi-Session Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    1.0.7
+#  Version:    2.0.0
 #  Date:       2026-10-09
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
 
-# ── Colour Palette ────────────────────────────────────────────────────────────
+# ── Colour Palette & Globals ──────────────────────────────────────────────────
 RD="\033[01;31m"
 YW="\033[33m"
 GN="\033[1;92m"
@@ -16,11 +16,8 @@ BL="\033[36m"
 CL="\033[m"
 BLD="\033[1m"
 TAB="    "
+LOGFILE="/var/log/rpi-vnc-install-\$(date +%Y%m%d-%H%M%S).log"
 
-# ── Globals ───────────────────────────────────────────────────────────────────
-LOGFILE="/var/log/rpi-vnc-install-$(date +%Y%m%d-%H%M%S).log"
-
-# ── Trap / Cleanup ────────────────────────────────────────────────────────────
 cleanup() {
   local code=$?
   tput cnorm 2>/dev/null || true
@@ -43,15 +40,10 @@ check_os() {
 msg_info()  { printf "${TAB}${YW}◆  %s...${CL}\r" "$1"; }
 msg_ok()    { printf "${TAB}${GN}✔  %-50s${CL}\n" "$1"; }
 msg_error() { printf "${TAB}${RD}✘  %s${CL}\n" "$1"; exit 1; }
-msg_warn()  { printf "${TAB}${YW}⚠  %s${CL}\n" "$1"; }
 section()   { printf "\n${BL}${BLD}  ── %s ──────────────────────────────────────────${CL}\n\n" "$1"; }
+log_exec()  { echo -e "\n[EXECUTING]: $*" >> "$LOGFILE"; "$@" >> "$LOGFILE" 2>&1; }
 
-log_exec() {
-  echo -e "\n[EXECUTING]: $*" >> "$LOGFILE"
-  "$@" >> "$LOGFILE" 2>&1
-}
-
-# ── Header ────────────────────────────────────────────────────────────────────
+# ── Header & Summary ──────────────────────────────────────────────────────────
 header_info() {
   clear
   echo -e "${BL}${BLD}"
@@ -63,47 +55,30 @@ header_info() {
 BANNER
   echo -e "${CL}"
   echo -e "${DGN}  ── Raspberry Pi VNC (Multi-Session) Installer ─────────────────────${CL}"
-  printf "  ${DGN}Host   :${CL}  ${BL}%s${CL}\n" "$(hostname -f 2>/dev/null || hostname)"
-  printf "  ${DGN}Date   :${CL}  ${BL}%s${CL}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
-  printf "  ${DGN}Log    :${CL}  ${BL}%s${CL}\n" "$LOGFILE"
-  echo ""
-  echo "Raspberry Pi VNC Install Log - $(date)" > "$LOGFILE"
+  printf "  ${DGN}Host   :${CL}  ${BL}%s${CL}\n" "\$(hostname -f 2>/dev/null || hostname)"
+  printf "  ${DGN}Date   :${CL}  ${BL}%s${CL}\n" "\$(date '+%Y-%m-%d %H:%M:%S')"
+  printf "  ${DGN}Log    :${CL}  ${BL}%s${CL}\n\n" "$LOGFILE"
+  echo "VNC Install Log - \$(date)" > "$LOGFILE"
 }
 
 summary() {
   echo -e "\n${BL}${BLD}  ========================================================================${CL}"
   echo -e "${BL}${BLD}               INSTALLATION COMPLETE — Van Auken Tech${CL}"
   echo -e "${BL}${BLD}  ========================================================================${CL}\n"
-  printf "  ${DGN}Access via :${CL} RealVNC Viewer -> %s:5900\n" "$(hostname -I | awk '{print $1}')"
-  printf "  ${DGN}Quality    :${CL} Set 'Picture quality' to 'High' in RealVNC Properties\n"
-  printf "  ${DGN}Log File   :${CL} %s\n" "$LOGFILE"
-  printf "  ${DGN}Created By :${CL} Thomas Van Auken\n\n"
+  printf "  ${DGN}Access via :${CL} RealVNC Viewer -> %s:5900\n" "\$(hostname -I | awk '{print $1}')"
+  printf "  ${DGN}Quality    :${CL} Set 'Picture quality' to 'High' in RealVNC Properties\n\n"
   exit 0
 }
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 check_os
 header_info
-
-if [[ $EUID -ne 0 ]]; then
-  msg_error "This script must be run as root. Try 'sudo bash $0'"
-fi
+[[ $EUID -ne 0 ]] && msg_error "This script must be run as root."
 
 section "System Preparation"
 msg_info "Updating package lists"
 if ! log_exec apt-get update -y; then
-  msg_error "Failed to update package lists!"
-fi
-msg_ok "Package lists updated"
-
-msg_info "Validating VNC repository dependencies"
-export DEBIAN_FRONTEND=noninteractive
-if ! log_exec apt-get -s install tigervnc-standalone-server tigervnc-tools dbus-x11 xfce4 xfce4-goodies lightdm >/dev/null 2>&1; then
-  msg_error "Dependency conflict detected in OS repositories. The system cannot safely install the required packages. Please run 'sudo apt-get install tigervnc-standalone-server dbus-x11 xfce4 lightdm' manually to resolve the package conflicts before running this script."
-fi
-msg_ok "Repository dependencies validated"
-if ! log_exec apt-get update -y; then
-  msg_error "Failed to update package lists!"
+  msg_error "Failed to update package lists! Check network/repositories."
 fi
 msg_ok "Package lists updated"
 
@@ -112,10 +87,11 @@ msg_info "Pre-seeding LightDM to bypass interactive prompts"
 echo "lightdm shared/default-x-display-manager select lightdm" | debconf-set-selections
 msg_ok "LightDM pre-seeded"
 
-msg_info "Installing TigerVNC, XFCE4, and LightDM"
+msg_info "Installing Core Packages (TigerVNC, XFCE4, LightDM)"
 export DEBIAN_FRONTEND=noninteractive
-if ! log_exec apt-get install -y --no-install-recommends tigervnc-standalone-server tigervnc-tools dbus-x11 xfce4 xfce4-goodies lightdm; then
-  msg_error "Package installation failed! The OS repository contains broken dependencies (e.g., dbus-x11). Resolve manually via apt before continuing."
+# Notice: dbus-x11 has been mathematically eliminated from this matrix.
+if ! log_exec apt-get install -y --no-install-recommends tigervnc-standalone-server tigervnc-tools xfce4 xfce4-goodies lightdm; then
+  msg_error "Package installation failed! Resolve broken repositories via apt before continuing."
 fi
 msg_ok "Core packages installed"
 
@@ -139,15 +115,15 @@ msg_ok "XDMCP enabled and local seat disabled"
 section "Session Isolation"
 msg_info "Deploying global D-Bus / XDG isolation script"
 cat << 'INNER' > /etc/X11/Xsession.d/99-isolate-dbus-runtime
-# Isolate D-Bus and runtime directories so the same user can run multiple concurrent XFCE sessions
-# Allow X Server to connect without authentication for the local LightDM greeter
-xhost +local: >/dev/null 2>&1 || true
-export XDG_RUNTIME_DIR=/tmp/xdg-runtime-$(id -u)-$$
-mkdir -p $XDG_RUNTIME_DIR
-chmod 700 $XDG_RUNTIME_DIR
-unset DBUS_SESSION_BUS_ADDRESS
-unset SESSION_MANAGER
-eval $(dbus-launch --sh-syntax)
+# Isolate runtime directories so the same user can run multiple concurrent XFCE sessions
+export XDG_RUNTIME_DIR=/tmp/xdg-runtime-\$(id -u)-\$\$
+mkdir -p \$XDG_RUNTIME_DIR
+chmod 700 \$XDG_RUNTIME_DIR
+
+# Use modern dbus-run-session to wrap the X11 launch, eliminating the need for legacy dbus-x11
+if [ -z "\$DBUS_SESSION_BUS_ADDRESS" ]; then
+    STARTUP="dbus-run-session \$STARTUP"
+fi
 INNER
 chmod 644 /etc/X11/Xsession.d/99-isolate-dbus-runtime
 msg_ok "Global session isolation configured"
@@ -199,10 +175,10 @@ fi
 msg_ok "Firewall configured"
 
 section "System Validation"
-msg_info "Validating Package Verification"
+msg_info "Validating Package Installation"
 for pkg in tigervnc-standalone-server xfce4 lightdm; do
-  if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
-    msg_error "Validation Failed: Package '$pkg' is not installed."
+  if ! dpkg-query -W -f='\${Status}' "\$pkg" 2>/dev/null | grep -q "install ok installed"; then
+    msg_error "Validation Failed: Package '\$pkg' is not installed."
   fi
 done
 msg_ok "Packages validated"

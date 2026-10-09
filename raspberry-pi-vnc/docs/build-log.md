@@ -79,3 +79,4 @@ sudo iptables -P INPUT ACCEPT
 
 ---
 <div style="text-align: right; font-size: 12px; color: gray;">Page 1</div>
+*   **Update 12:** Major architectural redesign (Version 2.0.0). Eliminated the legacy `dbus-x11` package completely to mathematically bypass fractured upstream repositories (like Kali/Ubuntu Noble). The script now intercepts the X11 pipeline globally using `dbus-run-session` built into the core OS.
