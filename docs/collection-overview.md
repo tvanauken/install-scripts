@@ -13,12 +13,6 @@ Scripts 1–4, 10–11 target Proxmox VE hosts directly. Script 5 targets Raspbe
 ---
 
 ## Scripts
-| Script | Command | Description |
-|---|---|---|
-| Houston UI | `bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/houston-jammy-v6.3.0.sh)` | Installs Cockpit, 45Drives modules, and custom Van Auken Tech branding. |
-| Script | Command | Description |
-|---|---|---|
-| Houston UI | `bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui/houston-jammy-v6.3.0.sh)` | Installs Cockpit, 45Drives modules, and custom Van Auken Tech branding. | in This Collection
 
 | # | Script | Directory | Target | Version | Purpose |
 |---|--------|-----------|--------|---------|--------|
@@ -34,8 +28,10 @@ Scripts 1–4, 10–11 target Proxmox VE hosts directly. Script 5 targets Raspbe
 | 10 | **PVE VM & CT Cleanup** | [`pve-vm-ct-cleanup/`](../pve-vm-ct-cleanup/) | **Proxmox VE** | **1.0.0** | Complete VM/CT removal with storage, snapshots, backups |
 | 11 | **Technitium DNS (Standalone)** | [`dns-server/`](../dns-server/) | **Proxmox VE** | **1.0.0** | Creates LXC + installs DNS server in one command |
 | 12 | **Technitium DNS (Generic)** | [`install/`](../install/) | **Debian 13** | **1.0.0** | Generic DNS installer with hardcoded 5-app config |
-| 13 | **Cisco 2600XM Terminal Server** | [`cisco-terminal-server/`](../cisco-terminal-server/) | **Cisco IOS** | **1.0.0** | Configures Cisco 2600XM as 32-port terminal server with paged menu system |
-| 14 | Houston UI Installer | [`houston-ui/`](../houston-ui/) | Proxmox VE / Ubuntu | 6.0.0 | Installs 45Drives Houston UI 1.0.0 | Installs 45Drives Houston UI & Cockpit | Cockpit |
+| 13 | **Cisco 2600XM Terminal Server** | [`cisco-terminal-server/`](../cisco-terminal-server/) | **Cisco IOS** | **1.0.0** | Configures Cisco 2600XM as 32-port terminal server |
+| 14 | Houston UI Installer | [`houston-ui/`](../houston-ui/) | Proxmox VE / Ubuntu | 6.0.0 | Installs 45Drives Houston UI & Cockpit |
+| 15 | Technitium SQLite Repair | [`technitium-sqlite-repair/`](../technitium-sqlite-repair/) | Debian/Ubuntu | 1.0.0 | Automates database repair for Technitium DNS |
+| 16 | **Raspberry Pi VNC Multi-Session** | [`raspberry-pi-vnc/`](../raspberry-pi-vnc/) | **Raspberry Pi** | **1.0.0** | True multi-user VNC sessions via systemd & XDMCP |
 
 > ⚠ Script 4 requires a **healthy PVE cluster** with quorum and root SSH access to all nodes. Target node must be empty (no VMs/containers).
 
@@ -76,7 +72,6 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/install/technitiumdnsgeneric-install.sh | bash
 ```
 
----
 ### Install Kali-Style Prompt (Any Linux Distro)
 ```bash
 bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/kali-prompt/kali-prompt-install.sh)
@@ -97,12 +92,16 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-script
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/houston-ui-universal/houston-universal-v1.0.0.sh)"
 ```
 
+### Technitium SQLite Repair
+```bash
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/main/technitium-sqlite-repair/technitium_sqlite_repair.sh)"
+```
+
+### Raspberry Pi VNC Multi-Session Installer
+```bash
+bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/raspberry-pi-vnc/raspberry-pi-vnc-install.sh)
+```
 
 ---
 
 *Created by: Thomas Van Auken — Van Auken Tech*
-
-**16. Raspberry Pi VNC Multi-Session Installer**
-```bash
-bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/raspberry-pi-vnc/raspberry-pi-vnc-install.sh)
-```
