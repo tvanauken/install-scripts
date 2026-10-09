@@ -101,3 +101,8 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-script
 ---
 
 *Created by: Thomas Van Auken — Van Auken Tech*
+
+**16. Raspberry Pi VNC Multi-Session Installer**
+```bash
+bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/raspberry-pi-vnc/raspberry-pi-vnc-install.sh)
+```

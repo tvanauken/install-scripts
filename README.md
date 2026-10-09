@@ -311,6 +311,18 @@ bash <(curl -fsSL https://raw.githubusercontent.com/tvanauken/install-scripts/ma
 
 ---
 
+### 16. Raspberry Pi VNC Multi-Session Installer
+**Directory:** [`raspberry-pi-vnc/`](raspberry-pi-vnc/)
+**Script:** [`raspberry-pi-vnc-install.sh`](raspberry-pi-vnc/raspberry-pi-vnc-install.sh)
+
+Installs a robust, headless VNC server on Raspberry Pi (Kali/Debian) that acts like a true RDP terminal server. Features systemd socket activation and XDMCP integration to spawn completely independent XFCE desktop sessions per connection, with full D-Bus isolation to support simultaneous logins by the same user without crashing.
+
+```bash
+bash <(curl -s https://raw.githubusercontent.com/tvanauken/install-scripts/main/raspberry-pi-vnc/raspberry-pi-vnc-install.sh)
+```
+
+---
+
 ## Visual Standard
 
 All scripts share the same Van Auken Tech visual identity:
