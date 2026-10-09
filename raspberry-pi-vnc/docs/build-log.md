@@ -80,3 +80,4 @@ sudo iptables -P INPUT ACCEPT
 ---
 <div style="text-align: right; font-size: 12px; color: gray;">Page 1</div>
 *   **Update 12:** Major architectural redesign (Version 2.0.0). Eliminated the legacy `dbus-x11` package completely to mathematically bypass fractured upstream repositories (like Kali/Ubuntu Noble). The script now intercepts the X11 pipeline globally using `dbus-run-session` built into the core OS.
+*   **Update 13:** Addressed a critical gap in the LightDM package payload that resulted in an un-themed, wireframe X11 fallback greeter, and caused subsequent successful logins to abort due to a missing default session (`session_real_run: assertion 'priv->argv != NULL' failed`). Injected `lightdm-gtk-greeter` and explicitly configured `greeter-session` and `user-session=xfce` in the LightDM configuration file to mathematically map the D-Bus handoff.

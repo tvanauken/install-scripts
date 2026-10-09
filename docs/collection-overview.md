@@ -19,19 +19,19 @@ Scripts 1–4, 10–11 target Proxmox VE hosts directly. Script 5 targets Raspbe
 | 1 | CLI Tools Installer | [`cli-tools/`](../cli-tools/) | Proxmox VE | 1.0.0 | Installs 46 CLI tools + X11 deps |
 | 2 | PVE Drive Cleanup & Init | [`pve-drive-init/`](../pve-drive-init/) | Proxmox VE | 1.0.0 | Wipes drives with remnant data for fresh deployment |
 | 3 | Drive Inventory Generator | [`drive-inventory/`](../drive-inventory/) | Proxmox VE | 1.0.0 | Scans all drives, generates markdown inventory report |
-| 4 | **PVE Cluster Node Removal** | [`pve-node-remove/`](../pve-node-remove/) | **Proxmox VE** | **2.0.0** | Safely removes a node from a PVE cluster |
+| 4 | **PVE Cluster Node Removal** | [`pve-node-remove/`](../pve-node-remove/) | **Proxmox VE** | **2.0.1** | Safely removes a node from a PVE cluster |
 | 5 | **Raspberry Pi Setup** | [`pi-setup/`](../pi-setup/) | **Raspberry Pi** | 1.0.0 | Kali tools + XFCE desktop + performance tuning |
 | 6 | Technitium DNS Server | [`dns-server/`](../dns-server/) | Debian/Ubuntu | **3.0.0** | UniFi survey, root hints, dynamic zones, auto-sync |
 | 7 | Nginx Proxy Manager | [`npm-reverse-proxy/`](../npm-reverse-proxy/) | Debian/Ubuntu | **3.0.0** | Native install, Lua SRV resolver, dynamic SSL proxy |
 | 8 | Kali-Style Prompt (Linux) | [`kali-prompt/`](../kali-prompt/) | Any Linux | **2.1.0** | Authentic Kali two-line prompt on any distro |
 | 9 | **Kali-Style Prompt (macOS)** | [`kali-prompt-macos/`](../kali-prompt-macos/) | **macOS 12.7.6+** | 2.0.0 | Authentic Kali-style prompt on Intel/Apple Silicon Macs |
-| 10 | **PVE VM & CT Cleanup** | [`pve-vm-ct-cleanup/`](../pve-vm-ct-cleanup/) | **Proxmox VE** | **2.0.0** | Complete VM/CT removal with storage, snapshots, backups |
-| 11 | **Technitium DNS (Standalone)** | [`dns-server/`](../dns-server/) | **Proxmox VE** | **2.0.0** | Creates LXC + installs DNS server in one command |
-| 12 | **Technitium DNS (Generic)** | [`install/`](../install/) | **Debian 13** | **2.0.0** | Generic DNS installer with hardcoded 5-app config |
-| 13 | **Cisco 2600XM Terminal Server** | [`cisco-terminal-server/`](../cisco-terminal-server/) | **Cisco IOS** | **2.0.0** | Configures Cisco 2600XM as 32-port terminal server |
+| 10 | **PVE VM & CT Cleanup** | [`pve-vm-ct-cleanup/`](../pve-vm-ct-cleanup/) | **Proxmox VE** | **2.0.1** | Complete VM/CT removal with storage, snapshots, backups |
+| 11 | **Technitium DNS (Standalone)** | [`dns-server/`](../dns-server/) | **Proxmox VE** | **2.0.1** | Creates LXC + installs DNS server in one command |
+| 12 | **Technitium DNS (Generic)** | [`install/`](../install/) | **Debian 13** | **2.0.1** | Generic DNS installer with hardcoded 5-app config |
+| 13 | **Cisco 2600XM Terminal Server** | [`cisco-terminal-server/`](../cisco-terminal-server/) | **Cisco IOS** | **2.0.1** | Configures Cisco 2600XM as 32-port terminal server |
 | 14 | Houston UI Installer | [`houston-ui/`](../houston-ui/) | Proxmox VE / Ubuntu | 6.0.0 | Installs 45Drives Houston UI & Cockpit |
 | 15 | Technitium SQLite Repair | [`technitium-sqlite-repair/`](../technitium-sqlite-repair/) | Debian/Ubuntu | 1.0.0 | Automates database repair for Technitium DNS |
-| 16 | **Raspberry Pi VNC Multi-Session** | [`raspberry-pi-vnc/`](../raspberry-pi-vnc/) | **Raspberry Pi** | **2.0.0** | True multi-user VNC sessions via systemd & XDMCP |
+| 16 | **Raspberry Pi VNC Multi-Session** | [`raspberry-pi-vnc/`](../raspberry-pi-vnc/) | **Raspberry Pi** | **2.0.1** | True multi-user VNC sessions via systemd & XDMCP |
 
 > ⚠ Script 4 requires a **healthy PVE cluster** with quorum and root SSH access to all nodes. Target node must be empty (no VMs/containers).
 

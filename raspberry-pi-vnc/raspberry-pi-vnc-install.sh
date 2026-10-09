@@ -2,7 +2,7 @@
 # ============================================================================
 #  Raspberry Pi / Debian — Headless VNC Multi-Session Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    2.0.0
+#  Version:    2.0.1
 #  Date:       2026-10-09
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -90,7 +90,7 @@ msg_ok "LightDM pre-seeded"
 msg_info "Installing Core Packages (TigerVNC, XFCE4, LightDM)"
 export DEBIAN_FRONTEND=noninteractive
 # Notice: dbus-x11 has been mathematically eliminated from this matrix.
-if ! log_exec apt-get install -y --no-install-recommends tigervnc-standalone-server tigervnc-tools xfce4 xfce4-goodies lightdm; then
+if ! log_exec apt-get install -y --no-install-recommends tigervnc-standalone-server tigervnc-tools xfce4 xfce4-goodies lightdm lightdm-gtk-greeter dbus-daemon; then
   msg_error "Package installation failed! Resolve broken repositories via apt before continuing."
 fi
 msg_ok "Core packages installed"
@@ -101,6 +101,11 @@ mkdir -p /etc/lightdm/lightdm.conf.d
 cat << 'CONF' > /etc/lightdm/lightdm.conf.d/50-xdmcp.conf
 [LightDM]
 start-default-seat=false
+user-authority-in-system-dir=false
+
+[Seat:*]
+greeter-session=lightdm-gtk-greeter
+user-session=xfce
 
 [XDMCPServer]
 enabled=true
@@ -110,7 +115,7 @@ CONF
 if ! log_exec systemctl restart lightdm; then
   msg_error "Failed to restart LightDM service!"
 fi
-msg_ok "XDMCP enabled and local seat disabled"
+msg_ok "XDMCP enabled, local seat disabled, and default session defined"
 
 section "Session Isolation"
 msg_info "Deploying global D-Bus / XDG isolation script"
