@@ -157,9 +157,42 @@ log_exec systemctl enable --now xvnc.socket
 msg_ok "Socket activation enabled"
 
 section "Firewall"
-msg_info "Flushing iptables for incoming connections"
-log_exec iptables -F
-log_exec iptables -P INPUT ACCEPT
-msg_ok "iptables cleared and configured"
+msg_info "Configuring firewall for incoming connections"
+if command -v ufw &>/dev/null; then
+  log_exec ufw allow 5900:5910/tcp
+elif command -v firewall-cmd &>/dev/null; then
+  log_exec firewall-cmd --permanent --add-port=5900-5910/tcp
+  log_exec firewall-cmd --reload
+else
+  log_exec iptables -F
+  log_exec iptables -P INPUT ACCEPT
+fi
+msg_ok "Firewall configured"
+
+section "System Validation"
+msg_info "Validating VNC Socket"
+if ! systemctl is-active --quiet xvnc.socket; then
+  msg_error "xvnc.socket failed to start!"
+fi
+if ! ss -tln | grep -q ":5900 "; then
+  msg_error "VNC port 5900 is not listening!"
+fi
+msg_ok "VNC socket is active and listening"
+
+msg_info "Validating LightDM XDMCP"
+if ! systemctl is-active --quiet lightdm; then
+  msg_error "LightDM is not running!"
+fi
+if ! ss -uln | grep -q ":177 "; then
+  msg_error "XDMCP is not listening on UDP port 177!"
+fi
+msg_ok "XDMCP service is operational"
+
+msg_info "Validating X11 Binary Paths"
+if [[ ! -f /usr/bin/Xvnc && ! -f /usr/bin/Xtigervnc ]]; then
+  msg_error "TigerVNC server binary not found on this system!"
+fi
+msg_ok "VNC binaries verified"
+
 
 summary
