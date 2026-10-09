@@ -1,83 +1,55 @@
-# VNC Setup on Germanium (Kali Linux Raspberry Pi 4)
+# Raspberry Pi VNC Multi-Session Installer — Engineering Specifications
 
 **Author: Thomas Van Auken — Van Auken Tech**
-**Revision 6**
+**Version: 2.0.1**
 
 <div style="background-color: #e3f2fd; border-left: 6px solid #1976d2; padding: 15px;">
-<strong>Purpose:</strong> Detailed log of actions taken to setup a robust, headless RealVNC-compatible VNC server on the new Raspberry Pi 4 running Kali Linux. This revision upgrades the multi-session conflict fix to be applied <strong>globally to all users</strong> on the system instead of just a single user account.
+<strong>Purpose:</strong> Complete engineering specification detailing the architecture of the headless RealVNC-compatible server deployed on Raspberry Pi (Kali/Debian/Ubuntu).
 </div>
 
-## 1. The Multi-Session Architecture (XDMCP + systemd sockets)
-To fulfill the requirement of spawning independent desktop environments for every single connection—even for the identical user—we use **systemd socket activation** intercepting incoming VNC traffic to instantly spawn an independent `Xvnc` process tied directly to the display manager's **XDMCP** service.
+## 1. Core Architecture (Systemd Sockets + XDMCP)
+Unlike traditional `vncserver` wrappers that lock a single display to a single port, this deployment utilizes an on-demand socket activator to function identically to a Citrix or RDP Terminal Server.
+- Systemd intercepts incoming TCP 5900 traffic via `xvnc.socket` (`Accept=yes`).
+- Systemd spawns an isolated `Xtigervnc` (or `Xvnc`) process for every connection.
+- `Xtigervnc` is explicitly commanded (`-query localhost`) to route graphics to the local `LightDM` greeter over UDP 177 (XDMCP).
+- Authentication is strictly handled by LightDM/PAM, stripping the need for weak VNC-level passwords (`-SecurityTypes=None`).
 
-## 2. Display Manager Configuration (LightDM)
-Enabled the XDMCP server inside LightDM so it can serve login screens to the dynamic Xvnc processes.
-```bash
-sudo mkdir -p /etc/lightdm/lightdm.conf.d
-sudo bash -c "cat << 'CONF' > /etc/lightdm/lightdm.conf.d/50-xdmcp.conf
+## 2. Display Manager Configuration
+LightDM is deployed as the central session manager. 
+- **Headless Optimization:** The local physical display is permanently disabled (`start-default-seat=false`) preventing the X server from crashing on Raspberry Pis with no attached monitors.
+- **Greeter Mapping:** The interface is explicitly locked to `lightdm-gtk-greeter` to prevent raw X11 fallback rendering.
+- **Session Mapping:** The target desktop is hardcoded (`user-session=xfce`) ensuring successful handoff post-authentication.
+
+```ini
+# /etc/lightdm/lightdm.conf.d/50-xdmcp.conf
+[LightDM]
+start-default-seat=false
+
 [XDMCPServer]
 enabled=true
 port=177
-CONF"
-sudo systemctl restart lightdm
+
+[Seat:*]
+greeter-session=lightdm-gtk-greeter
+user-session=xfce
 ```
 
-## 3. Global Concurrent Session Isolation (Xsession.d)
-Linux desktop environments natively crash when the same user attempts to initialize a second concurrent graphical session due to `systemd --user` and `dbus` conflicting over active session buses. To fix this comprehensively for **all current and future users**, we intercept the global X11 session initialization. 
+## 3. Global Same-User Concurrency
+Modern Linux desktop environments natively reject secondary concurrent sessions by the exact same user, as `systemd-logind` and D-Bus lock the active session bus.
+To bypass this limitation and allow unlimited simultaneous logins by the identical user, the global X11 initialization pipeline is intercepted.
 
-We created `/etc/X11/Xsession.d/99-isolate-dbus-runtime` to forcefully generate an isolated runtime directory and a discrete D-Bus instance for every new login session.
+A script injected into `/etc/X11/Xsession.d/99-isolate-dbus-runtime` mathematically sandboxes the environment per-connection:
+- Generates an isolated `XDG_RUNTIME_DIR` using the session's exact Process ID (`$$`).
+- Wraps the desktop execution sequence in `dbus-run-session`, creating a private D-Bus instance for every VNC window.
+- Eliminates legacy `dbus-x11` dependencies entirely.
 
-```bash
-# /etc/X11/Xsession.d/99-isolate-dbus-runtime
-# Isolate D-Bus and runtime directories so the same user can run multiple concurrent XFCE sessions
-export XDG_RUNTIME_DIR=/tmp/xdg-runtime-$(id -u)-$$
-mkdir -p $XDG_RUNTIME_DIR
-chmod 700 $XDG_RUNTIME_DIR
-unset DBUS_SESSION_BUS_ADDRESS
-unset SESSION_MANAGER
-eval $(dbus-launch --sh-syntax)
-```
-*(Note: This replaces the user-specific `~/.xsessionrc` fix from Revision 5).*
-
-## 4. Systemd Socket & Service Configuration
-Created a socket listening on VNC ports (5900 and 5901) with `Accept=yes` to spawn discrete connections.
-```ini
-# /etc/systemd/system/xvnc.socket
-[Unit]
-Description=XVNC Server Socket
-[Socket]
-ListenStream=5900
-ListenStream=5901
-Accept=yes
-[Install]
-WantedBy=sockets.target
-```
-
-Created the templated service that the socket launches to route the graphics back over the active socket from the LightDM greeter.
-```ini
-# /etc/systemd/system/xvnc@.service
-[Unit]
-Description=XVNC Per-Connection Daemon
-[Service]
-ExecStart=-/usr/bin/Xvnc -inetd -query localhost -geometry 1920x1080 -once -SecurityTypes=None
-User=nobody
-StandardInput=socket
-StandardError=syslog
-```
-
-## 5. Deployment & Verification
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now xvnc.socket
-sudo iptables -F
-sudo iptables -P INPUT ACCEPT
-```
-
-## 6. Client Configuration (Mac RealVNC Viewer)
-*   **Connecting:** Connect to `192.168.200.138:5900` or `192.168.200.138:5901`. 
-*   **Visual Quality:** To prevent color bleeding and chroma subsampling artifacts (blurriness), open connection **Properties** -> **Options** -> Change **Picture quality** from "Automatic" to **High**.
+## 4. Execution Flow & Validation
+The automated script enforces absolute deployment perfection:
+1. **Pre-Flight Validation:** Strictly verifies OS derivative (Debian/Ubuntu/Kali) and executes an `apt-get -s` dry-run. If upstream repositories are fractured, the script halts instantly.
+2. **Debconf Seeding:** Pre-seeds LightDM to guarantee zero interactive prompts during `apt-get` execution.
+3. **Dynamic Binary Mapping:** The systemd `ExecStart` block utilizes a bash wrapper to dynamically execute `/usr/bin/Xtigervnc` or `/usr/bin/Xvnc` based on the specific Debian derivative's filesystem.
+4. **Universal Firewall Configuration:** Detects and configures `ufw`, `firewalld`, or `iptables` autonomously.
+5. **Post-Flight Validation:** Mathematically verifies `dpkg-query` statuses, executable paths, and `ss -tln` / `ss -uln` listeners before declaring the installation complete.
 
 ---
 <div style="text-align: right; font-size: 12px; color: gray;">Page 1</div>
-*   **Update 12:** Major architectural redesign (Version 2.0.0). Eliminated the legacy `dbus-x11` package completely to mathematically bypass fractured upstream repositories (like Kali/Ubuntu Noble). The script now intercepts the X11 pipeline globally using `dbus-run-session` built into the core OS.
-*   **Update 13:** Addressed a critical gap in the LightDM package payload that resulted in an un-themed, wireframe X11 fallback greeter, and caused subsequent successful logins to abort due to a missing default session (`session_real_run: assertion 'priv->argv != NULL' failed`). Injected `lightdm-gtk-greeter` and explicitly configured `greeter-session` and `user-session=xfce` in the LightDM configuration file to mathematically map the D-Bus handoff.
