@@ -31,7 +31,7 @@ Scripts 1–4, 10–11 target Proxmox VE hosts directly. Script 5 targets Raspbe
 | 13 | **Cisco 2600XM Terminal Server** | [`cisco-terminal-server/`](../cisco-terminal-server/) | **Cisco IOS** | **1.0.0** | Configures Cisco 2600XM as 32-port terminal server |
 | 14 | Houston UI Installer | [`houston-ui/`](../houston-ui/) | Proxmox VE / Ubuntu | 6.0.0 | Installs 45Drives Houston UI & Cockpit |
 | 15 | Technitium SQLite Repair | [`technitium-sqlite-repair/`](../technitium-sqlite-repair/) | Debian/Ubuntu | 1.0.0 | Automates database repair for Technitium DNS |
-| 16 | **Raspberry Pi VNC Multi-Session** | [`raspberry-pi-vnc/`](../raspberry-pi-vnc/) | **Raspberry Pi** | **1.0.5** | True multi-user VNC sessions via systemd & XDMCP |
+| 16 | **Raspberry Pi VNC Multi-Session** | [`raspberry-pi-vnc/`](../raspberry-pi-vnc/) | **Raspberry Pi** | **1.0.6** | True multi-user VNC sessions via systemd & XDMCP |
 
 > ⚠ Script 4 requires a **healthy PVE cluster** with quorum and root SSH access to all nodes. Target node must be empty (no VMs/containers).
 

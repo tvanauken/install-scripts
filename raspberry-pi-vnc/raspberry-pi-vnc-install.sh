@@ -2,7 +2,7 @@
 # ============================================================================
 #  Raspberry Pi Kali Linux — Headless VNC Multi-Session Installer
 #  Created by: Thomas Van Auken — Van Auken Tech
-#  Version:    1.0.5
+#  Version:    1.0.6
 #  Date:       2026-10-09
 #  Repo:       https://github.com/tvanauken/install-scripts
 # ============================================================================
@@ -103,14 +103,8 @@ msg_ok "LightDM pre-seeded"
 
 msg_info "Installing TigerVNC, XFCE4, and LightDM"
 export DEBIAN_FRONTEND=noninteractive
-if ! apt-get -s install tigervnc-standalone-server tigervnc-tools dbus-x11 xfce4 xfce4-goodies lightdm >/dev/null 2>&1; then
-  msg_info "Broken dependencies detected. Deploying aptitude resolver"
-  log_exec apt-get --fix-broken install -y
-  log_exec apt-get install -y aptitude
-  log_exec env DEBIAN_FRONTEND=noninteractive aptitude install -y -q -f tigervnc-standalone-server tigervnc-tools dbus-x11 xfce4 xfce4-goodies lightdm
-fi
 if ! log_exec apt-get install -y --no-install-recommends tigervnc-standalone-server tigervnc-tools dbus-x11 xfce4 xfce4-goodies lightdm; then
-  msg_error "Package installation failed! Check logs: $LOGFILE"
+  msg_error "Package installation failed! The OS repository contains broken dependencies (e.g., dbus-x11). Resolve manually via apt before continuing."
 fi
 msg_ok "Core packages installed"
 
