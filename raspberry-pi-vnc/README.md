@@ -1,7 +1,7 @@
 # Raspberry Pi VNC Multi-Session Installer
 
 > Created by: Thomas Van Auken — Van Auken Tech  
-> Version: 1.0.2  
+> Version: 1.0.3  
 
 ## Overview
 A fully automated, production-ready installer that configures a true multi-session, headless VNC server on Raspberry Pi hardware (Kali Linux, Debian, or Ubuntu). Unlike traditional VNC setups that share a single desktop, this script uses **systemd socket activation** combined with **LightDM XDMCP** to spawn a completely independent graphical session for every connection.
