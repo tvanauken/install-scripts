@@ -102,6 +102,8 @@ section "Session Isolation"
 msg_info "Deploying global D-Bus / XDG isolation script"
 cat << 'INNER' > /etc/X11/Xsession.d/99-isolate-dbus-runtime
 # Isolate D-Bus and runtime directories so the same user can run multiple concurrent XFCE sessions
+# Allow X Server to connect without authentication for the local LightDM greeter
+xhost +local: >/dev/null 2>&1 || true
 export XDG_RUNTIME_DIR=/tmp/xdg-runtime-$(id -u)-$$
 mkdir -p $XDG_RUNTIME_DIR
 chmod 700 $XDG_RUNTIME_DIR
@@ -131,7 +133,7 @@ cat << 'SVC' > /etc/systemd/system/xvnc@.service
 [Unit]
 Description=XVNC Per-Connection Daemon
 [Service]
-ExecStart=-/usr/bin/Xvnc -inetd -query localhost -geometry 1920x1080 -once -SecurityTypes=None
+ExecStart=-/bin/bash -c "if [ -f /usr/bin/Xtigervnc ]; then /usr/bin/Xtigervnc -inetd -query localhost -geometry 1920x1080 -once -SecurityTypes=None; else /usr/bin/Xvnc -inetd -query localhost -geometry 1920x1080 -once -SecurityTypes=None; fi"
 User=nobody
 StandardInput=socket
 StandardError=syslog
