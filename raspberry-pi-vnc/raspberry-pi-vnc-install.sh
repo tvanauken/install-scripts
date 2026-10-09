@@ -55,17 +55,17 @@ header_info() {
 BANNER
   echo -e "${CL}"
   echo -e "${DGN}  ── Raspberry Pi VNC (Multi-Session) Installer ─────────────────────${CL}"
-  printf "  ${DGN}Host   :${CL}  ${BL}%s${CL}\n" "\$(hostname -f 2>/dev/null || hostname)"
-  printf "  ${DGN}Date   :${CL}  ${BL}%s${CL}\n" "\$(date '+%Y-%m-%d %H:%M:%S')"
+  printf "  ${DGN}Host   :${CL}  ${BL}%s${CL}\n" "$(hostname -f 2>/dev/null || hostname)"
+  printf "  ${DGN}Date   :${CL}  ${BL}%s${CL}\n" "$(date '+%Y-%m-%d %H:%M:%S')"
   printf "  ${DGN}Log    :${CL}  ${BL}%s${CL}\n\n" "$LOGFILE"
-  echo "VNC Install Log - \$(date)" > "$LOGFILE"
+  echo "VNC Install Log - $(date)" > "$LOGFILE"
 }
 
 summary() {
   echo -e "\n${BL}${BLD}  ========================================================================${CL}"
   echo -e "${BL}${BLD}               INSTALLATION COMPLETE — Van Auken Tech${CL}"
   echo -e "${BL}${BLD}  ========================================================================${CL}\n"
-  printf "  ${DGN}Access via :${CL} RealVNC Viewer -> %s:5900\n" "\$(hostname -I | awk '{print $1}')"
+  printf "  ${DGN}Access via :${CL} RealVNC Viewer -> %s:5900\n" "$(hostname -I | awk '{print $1}')"
   printf "  ${DGN}Quality    :${CL} Set 'Picture quality' to 'High' in RealVNC Properties\n\n"
   exit 0
 }
@@ -116,13 +116,13 @@ section "Session Isolation"
 msg_info "Deploying global D-Bus / XDG isolation script"
 cat << 'INNER' > /etc/X11/Xsession.d/99-isolate-dbus-runtime
 # Isolate runtime directories so the same user can run multiple concurrent XFCE sessions
-export XDG_RUNTIME_DIR=/tmp/xdg-runtime-\$(id -u)-\$\$
-mkdir -p \$XDG_RUNTIME_DIR
-chmod 700 \$XDG_RUNTIME_DIR
+export XDG_RUNTIME_DIR=/tmp/xdg-runtime-$(id -u)-\$\$
+mkdir -p $XDG_RUNTIME_DIR
+chmod 700 $XDG_RUNTIME_DIR
 
 # Use modern dbus-run-session to wrap the X11 launch, eliminating the need for legacy dbus-x11
-if [ -z "\$DBUS_SESSION_BUS_ADDRESS" ]; then
-    STARTUP="dbus-run-session \$STARTUP"
+if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+    STARTUP="dbus-run-session $STARTUP"
 fi
 INNER
 chmod 644 /etc/X11/Xsession.d/99-isolate-dbus-runtime
@@ -177,8 +177,8 @@ msg_ok "Firewall configured"
 section "System Validation"
 msg_info "Validating Package Installation"
 for pkg in tigervnc-standalone-server xfce4 lightdm; do
-  if ! dpkg-query -W -f='\${Status}' "\$pkg" 2>/dev/null | grep -q "install ok installed"; then
-    msg_error "Validation Failed: Package '\$pkg' is not installed."
+  if ! dpkg-query -W -f='${Status}' "$pkg" 2>/dev/null | grep -q "install ok installed"; then
+    msg_error "Validation Failed: Package '$pkg' is not installed."
   fi
 done
 msg_ok "Packages validated"
